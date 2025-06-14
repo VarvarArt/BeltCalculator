@@ -1,4 +1,4 @@
-# app.py (ПОЛНОСТЬЮ ЗАМЕНИТЬ весь старый код на этот)
+# 1_Calculator.py (ПОЛНОСТЬЮ ЗАМЕНИТЬ весь старый код на этот)
 
 import streamlit as st
 import math
