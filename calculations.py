@@ -1,12 +1,69 @@
 # calculations.py
 
 import math
-import pandas as pd
-from scipy.interpolate import griddata
+
 from data import (
     LOAD_COEFFICIENTS, P0_DATA_BY_V_RANGES, P0_VALUES, CL_DATA, CALPHA_DATA, CZ_DATA, MIN_PULLEY_DIAMETERS
 )
 
+
+def get_power_from_dataframe(df, d_query, n_query):
+    """
+    Извлекает мощность из DataFrame с помощью ручной билинейной интерполяции.
+    Это замена для неработающей функции scipy.interpolate.griddata.
+    """
+    if df is None or df.empty:
+        return 0.0
+
+    try:
+        # --- Шаг 1: Находим уникальные значения осей ---
+        unique_d = sorted(df['d'].unique())
+        unique_n = sorted(df['n1'].unique())
+
+        # --- Шаг 2: Находим 4 "опорные" точки вокруг нашего запроса ---
+
+        # Находим ближайшие диаметры (меньший и больший)
+        d_low = max([d for d in unique_d if d <= d_query], default=min(unique_d))
+        d_high = min([d for d in unique_d if d >= d_query], default=max(unique_d))
+
+        # Находим ближайшие обороты (меньшие и большие)
+        n_low = max([n for n in unique_n if n <= n_query], default=min(unique_n))
+        n_high = min([n for n in unique_n if n >= n_query], default=max(unique_n))
+
+        # --- Шаг 3: Получаем значения мощности в этих 4 точках ---
+
+        def get_pb(d_val, n_val):
+            res = df[(df['d'] == d_val) & (df['n1'] == n_val)]['Pb']
+            return res.iloc[0] if not res.empty else 0
+
+        q11 = get_pb(d_low, n_low)
+        q12 = get_pb(d_low, n_high)
+        q21 = get_pb(d_high, n_low)
+        q22 = get_pb(d_high, n_high)
+
+        # --- Шаг 4: Выполняем билинейную интерполяцию ---
+        if d_low == d_high and n_low == n_high:
+            return q11
+
+        if d_low == d_high:  # Интерполяция только по n
+            return q11 + (q12 - q11) * (n_query - n_low) / (n_high - n_low)
+
+        if n_low == n_high:  # Интерполяция только по d
+            return q11 + (q21 - q11) * (d_query - d_low) / (d_high - d_low)
+
+        # Общий случай
+        r1 = ((d_high - d_query) / (d_high - d_low)) * q11 + ((d_query - d_low) / (d_high - d_low)) * q21
+        r2 = ((d_high - d_query) / (d_high - d_low)) * q12 + ((d_query - d_low) / (d_high - d_low)) * q22
+
+        p = ((n_high - n_query) / (n_high - n_low)) * r1 + ((n_query - n_low) / (n_high - n_low)) * r2
+        return p
+
+    except Exception as e:
+        print(f"Ошибка в ручной интерполяции: {e}")
+        return 0.0
+
+
+# --- Остальные функции остаются без изменений ---
 
 def calculate_transmission_ratio(n1, n2):
     if n2 == 0: raise ValueError("Частота вращения ведомого вала (n2) не может быть равна нулю.")
@@ -129,37 +186,3 @@ def calculate_number_of_belts(p_design, p0, cl, calpha, cz_trial=1.0):
     denominator = p0 * cl * calpha * cz_trial
     if denominator == 0: raise ValueError("Деление на ноль при расчете количества ремней.")
     return p_design / denominator
-
-
-def get_power_from_dataframe(df_power, d1, n1):
-    """
-    Получает базовую мощность (Pb) из DataFrame, используя билинейную интерполяцию.
-    Версия с дополнительными проверками.
-    """
-    if df_power is None or df_power.empty:
-        return 0.0
-
-    df_power['d'] = pd.to_numeric(df_power['d'])
-    df_power['n1'] = pd.to_numeric(df_power['n1'])
-    df_power['Pb'] = pd.to_numeric(df_power['Pb'])
-    df_power = df_power.drop_duplicates(subset=['d', 'n1'])
-
-    points = df_power[['d', 'n1']].values
-    values = df_power['Pb'].values
-    query_point = (d1, n1)
-
-    try:
-        exact_match = df_power.loc[(df_power['d'] == d1) & (df_power['n1'] == n1), 'Pb']
-        if not exact_match.empty:
-            return float(exact_match.iloc[0])
-
-        power = griddata(points, values, query_point, method='linear')
-
-        if pd.isna(power):
-            power = griddata(points, values, query_point, method='nearest')
-
-        return float(power) if pd.notna(power) else 0.0
-
-    except Exception as e:
-        print(f"Критическая ошибка во время интерполяции: {e}")
-        return 0.0

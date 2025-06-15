@@ -1,7 +1,8 @@
 # 1_Calculator.py
 
-import streamlit as st
 import math
+
+import streamlit as st
 
 # --- ЕДИНЫЙ ПРАВИЛЬНЫЙ БЛОК ИМПОРТОВ ---
 from calculations import (
@@ -12,8 +13,7 @@ from calculations import (
     get_power_from_dataframe
 )
 from data import (
-    STANDARD_PULLEY_DIAMETERS, STANDARD_BELT_LENGTHS, P0_DATA_BY_V_RANGES, P0_VALUES,
-    CL_DATA, CALPHA_DATA, CZ_DATA, LOAD_COEFFICIENTS, MATERIAL_P0_CORRECTION_FACTORS,
+    STANDARD_PULLEY_DIAMETERS, STANDARD_BELT_LENGTHS, MATERIAL_P0_CORRECTION_FACTORS,
     load_power_data
 )
 
@@ -91,7 +91,7 @@ if st.button("Выполнить расчет"):
 
         if belt_section == 'C' and st.session_state['power_data_c'] is not None:
             st.success("✅ Используются точные данные из каталога для профиля 'C'.")
-            p0_base = get_power_from_dataframe(st.session_state['power_data_c'], selected_d1, n1)
+            p0_base = get_power_from_dataframe(st.session_state['power_data_c'], float(selected_d1), float(n1))
             st.info(f"Отладочная информация: Базовая мощность Pb из каталога = {p0_base:.2f} кВт")
         else:
             if belt_section != 'C':
@@ -99,7 +99,7 @@ if st.button("Выполнить расчет"):
                     f"⚠️ Используется обобщенный расчет для профиля '{belt_section}'. Точные данные доступны только для 'C'.")
             else:
                 st.error("Не удалось загрузить точные данные для 'C'. Используется обобщенный расчет.")
-            p0_base = get_p0_value(belt_section, belt_speed_v, 1.0)  # Получаем базовую мощность без учета материала
+            p0_base = get_p0_value(belt_section, belt_speed_v, 1.0)
 
         if p0_base <= 0.0:
             st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0. Расчет невозможен.")
