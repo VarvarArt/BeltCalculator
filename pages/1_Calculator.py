@@ -33,8 +33,7 @@ approx_center_distance = st.number_input("Примерное межосевое 
 st.subheader("2. Выбор типа нагрузки")
 load_type_mapping = {"Спокойная (равномерная) нагрузка": '1', "Средняя нагрузка (небольшие толчки)": '2',
                      "Тяжелая нагрузка (умеренные толчки)": '3', "Ударная нагрузка (сильные толчки)": '4'}
-selected_load_type_name = st.selectbox("Выберите тип нагрузки:", list(load_type_mapping.keys()),
-                                       index=2)  # "Тяжелая нагрузка"
+selected_load_type_name = st.selectbox("Выберите тип нагрузки:", list(load_type_mapping.keys()), index=2)
 load_type_choice = load_type_mapping[selected_load_type_name]
 
 st.subheader("3. Выбор материала ремня")
@@ -48,6 +47,7 @@ st.markdown("---")
 if st.button("Выполнить расчет"):
     st.header("4. Результаты расчета")
     try:
+        # ... (Код для расчета и вывода основных параметров до блока ремней)
         transmission_ratio = calculate_transmission_ratio(n1, n2)
         st.write(f"**Теоретическое передаточное число (i):** {transmission_ratio:.2f}")
 
@@ -85,14 +85,16 @@ if st.button("Выполнить расчет"):
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
         p0_base = 0.0
+        debug_info = ""
 
         if 'power_data_c' not in st.session_state:
             st.session_state['power_data_c'] = load_power_data('C')
 
         if belt_section == 'C' and st.session_state['power_data_c'] is not None:
             st.success("✅ Используются точные данные из каталога для профиля 'C'.")
-            p0_base = get_power_from_dataframe(st.session_state['power_data_c'], float(selected_d1), float(n1))
-            st.info(f"Отладочная информация: Базовая мощность Pb из каталога = {p0_base:.2f} кВт")
+            p0_base, debug_info = get_power_from_dataframe(st.session_state['power_data_c'], float(selected_d1),
+                                                           float(n1))
+            st.code(debug_info, language="text")  # ВЫВОД ДИАГНОСТИЧЕСКОГО ЛОГА
         else:
             if belt_section != 'C':
                 st.warning(

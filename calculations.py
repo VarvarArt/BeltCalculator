@@ -10,28 +10,31 @@ from data import (
 def get_power_from_dataframe(df, d_query, n_query):
     """
     Извлекает мощность из DataFrame с помощью ручной билинейной интерполяции.
-    Это замена для неработающей функции scipy.interpolate.griddata.
+    ВЕРСИЯ С ПОЛНЫМ ЛОГИРОВАНИЕМ ДЛЯ ДИАГНОСТИКИ.
+    Возвращает кортеж: (результат, строка_лога).
     """
-    if df is None or df.empty:
-        return 0.0
-
+    debug_log = []
     try:
+        if df is None or df.empty:
+            return 0.0, "ЛОГ: DataFrame пуст."
+
+        debug_log.append("--- НАЧАЛО ДИАГНОСТИКИ ИНТЕРПОЛЯЦИИ ---")
+        debug_log.append(f"Запрос: d_query = {d_query}, n_query = {n_query}")
+
         # --- Шаг 1: Находим уникальные значения осей ---
         unique_d = sorted(df['d'].unique())
         unique_n = sorted(df['n1'].unique())
+        debug_log.append(f"Уникальные диаметры (первые 5): {unique_d[:5]}")
+        debug_log.append(f"Уникальные обороты (первые 5): {unique_n[:5]}")
 
-        # --- Шаг 2: Находим 4 "опорные" точки вокруг нашего запроса ---
-
-        # Находим ближайшие диаметры (меньший и больший)
+        # --- Шаг 2: Находим 4 "опорные" точки ---
         d_low = max([d for d in unique_d if d <= d_query], default=min(unique_d))
         d_high = min([d for d in unique_d if d >= d_query], default=max(unique_d))
-
-        # Находим ближайшие обороты (меньшие и большие)
         n_low = max([n for n in unique_n if n <= n_query], default=min(unique_n))
         n_high = min([n for n in unique_n if n >= n_query], default=max(unique_n))
+        debug_log.append(f"Опорные точки: d_low={d_low}, d_high={d_high}, n_low={n_low}, n_high={n_high}")
 
         # --- Шаг 3: Получаем значения мощности в этих 4 точках ---
-
         def get_pb(d_val, n_val):
             res = df[(df['d'] == d_val) & (df['n1'] == n_val)]['Pb']
             return res.iloc[0] if not res.empty else 0
@@ -40,30 +43,41 @@ def get_power_from_dataframe(df, d_query, n_query):
         q12 = get_pb(d_low, n_high)
         q21 = get_pb(d_high, n_low)
         q22 = get_pb(d_high, n_high)
+        debug_log.append(
+            f"Значения в точках: Q11({d_low},{n_low})={q11:.2f}, Q12({d_low},{n_high})={q12:.2f}, Q21({d_high},{n_low})={q21:.2f}, Q22({d_high},{n_high})={q22:.2f}")
 
         # --- Шаг 4: Выполняем билинейную интерполяцию ---
         if d_low == d_high and n_low == n_high:
-            return q11
+            debug_log.append("Точное совпадение. Возвращаем Q11.")
+            return q11, "\n".join(debug_log)
 
-        if d_low == d_high:  # Интерполяция только по n
-            return q11 + (q12 - q11) * (n_query - n_low) / (n_high - n_low)
+        # Горизонтальная интерполяция для нижней и верхней границ n
+        if (d_high - d_low) == 0:
+            r1 = q11;
+            r2 = q12
+            debug_log.append("Интерполяция только по оси n (d_low == d_high).")
+        else:
+            r1 = ((d_high - d_query) / (d_high - d_low)) * q11 + ((d_query - d_low) / (d_high - d_low)) * q21
+            r2 = ((d_high - d_query) / (d_high - d_low)) * q12 + ((d_query - d_low) / (d_high - d_low)) * q22
+            debug_log.append(f"Промежуточная интерполяция по d: R1={r1:.2f}, R2={r2:.2f}")
 
-        if n_low == n_high:  # Интерполяция только по d
-            return q11 + (q21 - q11) * (d_query - d_low) / (d_high - d_low)
+        # Вертикальная интерполяция
+        if (n_high - n_low) == 0:
+            p = r1
+            debug_log.append("Интерполяция только по оси d (n_low == n_high).")
+        else:
+            p = ((n_high - n_query) / (n_high - n_low)) * r1 + ((n_query - n_low) / (n_high - n_low)) * r2
 
-        # Общий случай
-        r1 = ((d_high - d_query) / (d_high - d_low)) * q11 + ((d_query - d_low) / (d_high - d_low)) * q21
-        r2 = ((d_high - d_query) / (d_high - d_low)) * q12 + ((d_query - d_low) / (d_high - d_low)) * q22
-
-        p = ((n_high - n_query) / (n_high - n_low)) * r1 + ((n_query - n_low) / (n_high - n_low)) * r2
-        return p
+        debug_log.append(f"Финальный результат интерполяции: P = {p:.2f}")
+        debug_log.append("--- КОНЕЦ ДИАГНОСТИКИ ---")
+        return p, "\n".join(debug_log)
 
     except Exception as e:
-        print(f"Ошибка в ручной интерполяции: {e}")
-        return 0.0
+        debug_log.append(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        return 0.0, "\n".join(debug_log)
 
 
-# --- Остальные функции остаются без изменений ---
+# --- Остальные функции (без изменений) ---
 
 def calculate_transmission_ratio(n1, n2):
     if n2 == 0: raise ValueError("Частота вращения ведомого вала (n2) не может быть равна нулю.")
