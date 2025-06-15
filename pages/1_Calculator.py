@@ -1,9 +1,9 @@
-# 1_Calculator.py (ПОЛНОСТЬЮ ЗАМЕНИТЬ весь старый код на этот)
-
+# 1_Calculator.py
 import streamlit as st
 import math
 
-# Импортируем все необходимые функции и данные из наших файлов
+# --- ЕДИНЫЙ ПРАВИЛЬНЫЙ БЛОК ИМПОРТОВ ---
+# Импортируем все необходимые функции-расчеты из calculations.py
 from calculations import (
     calculate_transmission_ratio,
     calculate_design_power,
@@ -19,10 +19,11 @@ from calculations import (
     calculate_angle_of_wrap,
     get_calpha_value,
     get_cz_value,
-    calculate_number_of_belts
+    calculate_number_of_belts,
+    get_power_from_dataframe  # <-- Добавлено сюда
 )
 
-# Импортируем данные из data.py
+# Импортируем все данные и функцию загрузки из data.py
 from data import (
     STANDARD_PULLEY_DIAMETERS,
     STANDARD_BELT_LENGTHS,
@@ -32,8 +33,11 @@ from data import (
     CALPHA_DATA,
     CZ_DATA,
     LOAD_COEFFICIENTS,
-    MATERIAL_P0_CORRECTION_FACTORS
+    MATERIAL_P0_CORRECTION_FACTORS,
+    load_power_data           # <-- Добавлено сюда
 )
+
+# --- КОНЕЦ БЛОКА ИМПОРТОВ ---
 # 1_Calculator.py
 # ...
 from calculations import (
