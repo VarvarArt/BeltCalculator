@@ -131,9 +131,7 @@ MATERIAL_P0_CORRECTION_FACTORS = {
 
 # data.py
 
-# ... (весь ваш существующий код словарей) ...
-
-# <<< НОВЫЙ КОД НИЖЕ >>>
+# <<< ЗАМЕНИТЕ СТАРУЮ ВЕРСИЮ ФУНКЦИИ НА ЭТУ >>>
 
 def load_power_data(profile, data_dir="parsed_data"):
     """
@@ -150,8 +148,6 @@ def load_power_data(profile, data_dir="parsed_data"):
     filepath = os.path.join(data_dir, filename)
 
     if not os.path.exists(filepath):
-        # Если файл для данного профиля не найден, это не ошибка,
-        # просто для него нет точных данных.
         return None
 
     try:
