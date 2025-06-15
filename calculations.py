@@ -1,6 +1,9 @@
 # calculations.py
 import math
 
+import pandas as pd
+from scipy.interpolate import griddata
+
 from data import (  # Эти импорты могут остаться для автономной работы calculations.py
     MIN_PULLEY_DIAMETERS,
     LOAD_COEFFICIENTS,
@@ -279,3 +282,56 @@ def calculate_number_of_belts(p_design, p0, cl, calpha, cz_trial=1.0):
 
     z_calc = p_design / denominator
     return z_calc
+
+
+# calculations.py
+
+# ... (весь ваш существующий код функций) ...
+
+# <<< НОВЫЙ КОД НИЖЕ >>>
+
+def get_power_from_dataframe(df_power, d1, n1):
+    """
+    Получает базовую мощность (Pb) из DataFrame с данными каталога,
+    используя билинейную интерполяцию.
+
+    Args:
+        df_power (pd.DataFrame): DataFrame с колонками 'd', 'n1', 'Pb'.
+        d1 (float): Диаметр ведущего шкива.
+        n1 (float): Частота вращения ведущего вала.
+
+    Returns:
+        float: Значение базовой мощности Pb или 0.0, если расчет не удался.
+    """
+    if df_power is None or df_power.empty:
+        return 0.0
+
+    # --- Подготовка данных для интерполяции ---
+    # Точки, которые у нас есть в каталоге (координаты X, Y)
+    points = df_power[['d', 'n1']].values
+    # Значения в этих точках (координата Z)
+    values = df_power['Pb'].values
+
+    # Точка, в которой мы хотим узнать значение
+    query_point = (d1, n1)
+
+    # --- Выполнение интерполяции ---
+    # griddata - это мощная функция, которая делает всю математику за нас.
+    # Она находит ближайшие известные точки вокруг нашей и вычисляет среднее.
+    try:
+        interpolated_power = griddata(points, values, query_point, method='linear')
+
+        # Если наш запрос находится далеко за пределами данных каталога,
+        # griddata вернет 'nan'. В этом случае используем ближайшую точку.
+        if pd.isna(interpolated_power):
+            interpolated_power = griddata(points, values, query_point, method='nearest')
+
+        return float(interpolated_power) if pd.notna(interpolated_power) else 0.0
+
+    except Exception as e:
+        print(f"Ошибка во время интерполяции: {e}")
+        return 0.0
+
+
+def load_power_data():
+    return None

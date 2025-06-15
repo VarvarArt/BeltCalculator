@@ -1,6 +1,8 @@
 # data.py
 # Словари для хранения статических данных калькулятора
-
+# импорт библиотек
+import pandas as pd
+import os
 # Минимальные рекомендуемые диаметры шкивов в мм для каждого сечения клинового ремня
 MIN_PULLEY_DIAMETERS = {
     "Z(0)": 50,
@@ -125,3 +127,37 @@ MATERIAL_P0_CORRECTION_FACTORS = {
     "Высокопрочный (CR/Арамид)": 1.2,       # Например, на 20% больше мощности
     "Премиум (TPU/Арамид или Сталь)": 1.35   # Например, на 35% больше мощности
 }
+
+
+# data.py
+
+# ... (весь ваш существующий код словарей) ...
+
+# <<< НОВЫЙ КОД НИЖЕ >>>
+
+def load_power_data(profile, data_dir="parsed_data"):
+    """
+    Загружает данные о мощности из CSV-файла для указанного профиля.
+
+    Args:
+        profile (str): Профиль ремня (например, 'C').
+        data_dir (str): Папка, где лежат CSV файлы.
+
+    Returns:
+        pandas.DataFrame: Загруженная таблица с данными или None, если файл не найден.
+    """
+    filename = f"power_data_{profile}_Pb.csv"
+    filepath = os.path.join(data_dir, filename)
+
+    if not os.path.exists(filepath):
+        # Если файл для данного профиля не найден, это не ошибка,
+        # просто для него нет точных данных.
+        return None
+
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Успешно загружены данные для профиля {profile} из файла {filepath}")
+        return df
+    except Exception as e:
+        print(f"Ошибка при чтении файла {filepath}: {e}")
+        return None

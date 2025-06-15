@@ -34,7 +34,15 @@ from data import (
     LOAD_COEFFICIENTS,
     MATERIAL_P0_CORRECTION_FACTORS
 )
-
+# 1_Calculator.py
+# ...
+from calculations import (
+    # ... (все ваши старые импорты) ...
+    calculate_number_of_belts,
+    load_power_data,              # <<< НОВОЕ
+    get_power_from_dataframe      # <<< НОВОЕ
+)
+# ...
 # --- Настройки страницы Streamlit ---
 st.set_page_config(
     page_title="Калькулятор приводных ремней",
@@ -186,20 +194,54 @@ if st.button("Выполнить расчет"):
             st.error(f"Ошибка при уточнении межосевого расстояния: {e}")
             st.stop()
 
+        # 1_Calculator.py (внутри if st.button(...))
+
+        # <<< НАЧАЛО НОВОГО БЛОКА >>>
+
         # --- 7. Расчет количества ремней (z) ---
         st.subheader("5. Расчет количества ремней")
 
         belt_speed_v = calculate_belt_speed(selected_d1, n1)
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
-        p0_value = get_p0_value(belt_section, belt_speed_v,
-                                material_correction_factor=material_correction_factor,
-                                p0_ranges_data=P0_DATA_BY_V_RANGES, p0_values_data=P0_VALUES)
+        p0_value = 0.0
+
+        # --- УМНАЯ ЛОГИКА ВЫБОРА МЕТОДА РАСЧЕТА ---
+
+        # Загружаем данные для профиля 'C', если они еще не загружены
+        if 'power_data_c' not in st.session_state:
+            st.session_state['power_data_c'] = load_power_data('C')
+
+        # Если определен профиль 'C' и для него есть точные данные
+        if belt_section == 'C' and st.session_state['power_data_c'] is not None:
+            st.success("✅ Используются точные данные из каталога для профиля 'C'.")
+
+            # Получаем базовую мощность Pb из нашей таблицы
+            # Примечание: Мы пока не учитываем добавочную мощность Pd для простоты.
+            p0_value = get_power_from_dataframe(st.session_state['power_data_c'], selected_d1, n1)
+
+            # Применяем коэффициент материала к базовой мощности
+            p0_value *= material_correction_factor
+
+        # Для всех остальных профилей используем старый метод
+        else:
+            if belt_section != 'C':
+                st.warning(
+                    f"⚠️ Используется обобщенный расчет для профиля '{belt_section}'. Точные данные доступны только для профиля 'C'.")
+            else:
+                st.error("Не удалось загрузить точные данные для профиля 'C'. Используется обобщенный расчет.")
+
+            # Старый, обобщенный метод расчета P0
+            p0_value = get_p0_value(belt_section, belt_speed_v,
+                                    material_correction_factor=material_correction_factor,
+                                    p0_ranges_data=P0_DATA_BY_V_RANGES, p0_values_data=P0_VALUES)
+
         if p0_value == 0.0:
-            st.error("ВНИМАНИЕ: Не удалось определить P0 для данного сечения и скорости. Расчет количества ремней невозможен.")
+            st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0. Расчет количества ремней невозможен.")
             st.stop()
         st.write(f"**Номинальная мощность P0, передаваемая одним ремнем (с учетом материала):** {p0_value:.2f} кВт")
 
+        # --- Остальная часть кода остается без изменений ---
         cl_value = get_cl_value(belt_section, selected_lp, cl_data=CL_DATA)
         st.write(f"**Коэффициент длины ремня (CL):** {cl_value:.2f}")
 
@@ -210,16 +252,14 @@ if st.button("Выполнить расчет"):
             st.write(f"**Коэффициент угла обхвата (C_alpha):** {calpha_value:.2f}")
         except ValueError as e:
             st.error(f"Ошибка при расчете угла обхвата: {e}. Использовано значение C_alpha по умолчанию.")
-            calpha_value = 1.0 # Заглушка, если ошибка
+            calpha_value = 1.0
 
-        # Расчет z (первое приближение, Cz = 1.0)
         z_calculated_initial = calculate_number_of_belts(
             calculated_power, p0_value, cl_value, calpha_value, cz_trial=1.0
         )
 
         num_belts_rounded = math.ceil(z_calculated_initial)
-        if num_belts_rounded == 0:
-            num_belts_rounded = 1
+        if num_belts_rounded == 0: num_belts_rounded = 1
 
         cz_value_final = get_cz_value(num_belts_rounded, cz_data=CZ_DATA)
         st.write(f"**Коэффициент количества ремней (Cz) для {num_belts_rounded} ремней:** {cz_value_final:.2f}")
@@ -228,10 +268,12 @@ if st.button("Выполнить расчет"):
             calculated_power, p0_value, cl_value, calpha_value, cz_trial=cz_value_final
         )
         final_num_belts = math.ceil(final_z_value)
-        if final_num_belts == 0:
-            final_num_belts = 1
+        if final_num_belts == 0: final_num_belts = 1
+
         st.write(f"**Окончательное расчетное количество ремней:** {final_z_value:.2f}")
         st.success(f"**Рекомендуемое количество ремней (целое): {final_num_belts} шт.**")
+
+        # <<< КОНЕЦ НОВОГО БЛОКА >>>
 
     except Exception as e:
         st.error(f"Произошла ошибка при выполнении расчетов: {e}")
