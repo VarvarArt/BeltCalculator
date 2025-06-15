@@ -26,14 +26,15 @@ st.markdown("---")
 st.header("1. Ввод основных параметров")
 power = st.number_input("Номинальная мощность (P) в кВт:", 0.1, value=15.0, step=0.1, format="%.2f")
 n1 = st.number_input("Частота вращения ведущего вала (n1) в об/мин:", 1.0, value=1450.0, step=1.0, format="%.1f")
-n2 = st.number_input("Частота вращения ведомого вала (n2) в об/мин:", 1.0, value=480.0, step=1.0, format="%.1f")
+n2 = st.number_input("Частота вращения ведомого вала (n2) в об/мин:", 1.0, value=650.0, step=1.0, format="%.1f")
 approx_center_distance = st.number_input("Примерное межосевое расстояние (a_прим) в мм:", 100.0, value=1000.0,
                                          step=10.0, format="%.1f")
 
 st.subheader("2. Выбор типа нагрузки")
 load_type_mapping = {"Спокойная (равномерная) нагрузка": '1', "Средняя нагрузка (небольшие толчки)": '2',
                      "Тяжелая нагрузка (умеренные толчки)": '3', "Ударная нагрузка (сильные толчки)": '4'}
-selected_load_type_name = st.selectbox("Выберите тип нагрузки:", list(load_type_mapping.keys()), index=1)
+selected_load_type_name = st.selectbox("Выберите тип нагрузки:", list(load_type_mapping.keys()),
+                                       index=2)  # "Тяжелая нагрузка"
 load_type_choice = load_type_mapping[selected_load_type_name]
 
 st.subheader("3. Выбор материала ремня")
@@ -83,37 +84,38 @@ if st.button("Выполнить расчет"):
         belt_speed_v = calculate_belt_speed(selected_d1, n1)
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
-        p0_value = 0.0
+        p0_base = 0.0
 
         if 'power_data_c' not in st.session_state:
             st.session_state['power_data_c'] = load_power_data('C')
 
         if belt_section == 'C' and st.session_state['power_data_c'] is not None:
             st.success("✅ Используются точные данные из каталога для профиля 'C'.")
-            p0_value = get_power_from_dataframe(st.session_state['power_data_c'], selected_d1, n1)
-            p0_value *= material_correction_factor
+            p0_base = get_power_from_dataframe(st.session_state['power_data_c'], selected_d1, n1)
+            st.info(f"Отладочная информация: Базовая мощность Pb из каталога = {p0_base:.2f} кВт")
         else:
             if belt_section != 'C':
                 st.warning(
                     f"⚠️ Используется обобщенный расчет для профиля '{belt_section}'. Точные данные доступны только для 'C'.")
             else:
                 st.error("Не удалось загрузить точные данные для 'C'. Используется обобщенный расчет.")
-            p0_value = get_p0_value(belt_section, belt_speed_v, material_correction_factor)
+            p0_base = get_p0_value(belt_section, belt_speed_v, 1.0)  # Получаем базовую мощность без учета материала
 
-        if p0_value == 0.0:
+        if p0_base <= 0.0:
             st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0. Расчет невозможен.")
             st.stop()
 
-        st.write(f"**Номинальная мощность P0 (с учетом материала):** {p0_value:.2f} кВт")
+        p0_final = p0_base * material_correction_factor
+        st.write(f"**Номинальная мощность P0 (с учетом материала):** {p0_final:.2f} кВт")
 
         cl_value = get_cl_value(belt_section, selected_lp)
         angle_alpha1_deg = calculate_angle_of_wrap(selected_d1, selected_d2, actual_center_distance)
         calpha_value = get_calpha_value(angle_alpha1_deg)
 
-        z_calculated_initial = calculate_number_of_belts(calculated_power, p0_value, cl_value, calpha_value, 1.0)
+        z_calculated_initial = calculate_number_of_belts(calculated_power, p0_final, cl_value, calpha_value, 1.0)
         num_belts_rounded = math.ceil(z_calculated_initial) if z_calculated_initial > 0 else 1
         cz_value_final = get_cz_value(num_belts_rounded)
-        final_z_value = calculate_number_of_belts(calculated_power, p0_value, cl_value, calpha_value, cz_value_final)
+        final_z_value = calculate_number_of_belts(calculated_power, p0_final, cl_value, calpha_value, cz_value_final)
         final_num_belts = math.ceil(final_z_value) if final_z_value > 0 else 1
 
         st.info(
