@@ -5,6 +5,8 @@ import os
 import csv
 
 
+import re
+
 def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
     cl_data_for_profiles = {profile: {} for profile in profiles_in_order}
     debug_messages = []
@@ -16,7 +18,15 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
             for _ in range(10):
                 row = next(reader)
                 if "INCHES" in row[0] or "INCHES" in row[1]:
-                    lengths_inches = [float(l.replace('½', '.5').replace('¼', '.25').replace('¾', '.75').replace(',', '.').strip()) for l in row[1:] if l.strip()]
+                    lengths_inches = []
+                    for l in row[1:]:
+                        clean_l = re.sub(r'[^
+\d.-]', '', l.replace(',', '.').strip())
+                        if clean_l:
+                            try:
+                                lengths_inches.append(float(clean_l))
+                            except ValueError:
+                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric length: {l}")
                     header_found = True
                     break
             if not header_found:
@@ -30,7 +40,16 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
                     continue
                 profile_name = row[0].strip().replace('"', '')
                 if profile_name in profiles_in_order:
-                    cl_values = [float(val.replace(',', '.').strip()) for val in row[1:] if val.strip()]
+                    cl_values = []
+                    for val in row[1:]:
+                        clean_val = re.sub(r'[^
+\d.-]', '', val.replace(',', '.').strip())
+                        if clean_val:
+                            try:
+                                cl_values.append(float(clean_val))
+                            except ValueError:
+                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric CL value: {val}")
+                    
                     for i, cl_val in enumerate(cl_values):
                         if i < len(lengths_mm):
                             cl_data_for_profiles[profile_name][round(lengths_mm[i])] = cl_val
