@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.log
+*.sqlite3
+*.db
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data/output folders (исходя из вашей структуры)
+parsed_images/
+parsed_text/
+
+# PDF и временные файлы
+*.pdf
+*.bak
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Не игнорировать parsed_tables (важно для проекта)
+!parsed_tables/
