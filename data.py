@@ -105,12 +105,15 @@ def _parse_pb_csv(filepath):
         return None, debug_messages
 
 
-def load_all_data(data_dir="parsed_data"):
+def load_all_data():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(current_dir, "parsed_tables")
+
     all_cl_data = {}
     all_pb_data = {}
     all_debug_messages = []
 
-    all_debug_messages.append("DEBUG: load_all_data - Функция загрузки данных вызвана.")
+    all_debug_messages.append(f"DEBUG: load_all_data - Функция загрузки данных вызвана. Data directory: {data_dir}")
 
     cl_profiles_classical = ["Z", "A", "B", "C", "D", "E", "20", "25"]
     cl_data_classical, debug_cl_classical = _parse_cl_csv(os.path.join(data_dir, "page_026_table_2.csv"), cl_profiles_classical)

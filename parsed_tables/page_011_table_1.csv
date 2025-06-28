@@ -1,0 +1,20 @@
+TABLE 1 - TYPE OF MOTOR,,,,,,
+Applications,Daily operating hours,,,,,
+,0-8(1),8-16(1),16-24(1),0-8(2),8-16(2),16-24(2)
+Light use,,,,,,
+"Centrifugal pumps and compressors, belt conveyors,
+(light materials) fans and pumps up to 7,5 kW.","1,1","1,1","1,2","1,1","1,2","1,3"
+Normal use,,,,,,
+"Shears for steel sheet presses, belt and chain
+conveyors, (heavy material) sifters, generator sets,
+machine tools, kneading machines, industrial wa-
+shing machines, printing presses, fans and pumps
+over 7,5 kW.","1,1","1,2","1,3","1,2","1,3","1,4"
+Heavy use,,,,,,
+"Hammer mills, piston compressors, belt conveyors
+for heavy loads, lifters, textile machines, continuous
+paper machines, piston and dredging pumps,
+ripping saws.","1,2","1,3","1,4","1,4","1,5","1,6"
+Extra heavy use,,,,,,
+"High power mills, stone crushers, calendars, mixer,
+cranes, diggers, dredgers.","1,3","1,4","1,5","1,5","1,6","1,8"

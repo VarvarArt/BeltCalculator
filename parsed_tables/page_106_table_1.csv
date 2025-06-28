@@ -1,0 +1,15 @@
+BELT CHARACTERISTICS,,,,,,,,,,,,,,,,
+SECTION,13X6,17X6,21X7,22X8,26X8,28X8,30X10,32X10,36X12,37X10,42X13,47X13,52X16,55X16,65X20,70X20
+w (mm),13,17,21,22,26,28,30,32,36,37,42,47,52,55,65,70
+T (mm),6,6,7,8,8,8,10,10,12,10,13,13,16,16,20,20
+"Pitch length - internal
+length = ∆i (mm)",29,29,33,38,38,38,47,47,56,47,61,61,75,75,94,94
+"External length - pitch
+length = ∆e (mm)",9,9,11,12,12,12,16,16,19,16,21,21,25,25,31,31
+Iso,,W16,W20,,W25,,,"W31,5",,,W40,,W50,,W63,
+Ss (°),26,26,26,26,26,26,26,26,30,30,30,30,30,30,30,30
+Working temperature,-30°C / +90°C,,,,,,,,,,,,,,,
+Relevant standards,ISO 1604 (for W... type only),,,,,,,,,,,,,,,
+"Relevant antistatic
+standard",ISO 1813,,,,,,,,,,,,,,,
+Materials,­CR blend - polyester cord,,,,,,,,,,,,,,,

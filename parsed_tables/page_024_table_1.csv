@@ -1,0 +1,6 @@
+SYMBOL,UNIT,DEFINITION
+F,N,perpendicular deflection force
+f,mm,belt deflection
+t,mm,free span length
+"T
+s",N/strand,static belt tension (see page 9)

@@ -44,7 +44,7 @@ st.markdown("---")
 if st.button("Выполнить расчет"):
     st.header("4. Результаты расчета")
     try:
-        _ALL_DATA = load_all_data(data_dir="parsed_tables")
+        _ALL_DATA = load_all_data()
         CL_DATA = _ALL_DATA["CL_DATA"]
         PB_DATA = _ALL_DATA["PB_DATA"]
         debug_messages = _ALL_DATA.get("DEBUG_MESSAGES", [])

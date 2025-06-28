@@ -1,0 +1,44 @@
+SYMBOL,UNIT,DEFINITION
+"C
+γ",,"correction factor C
+γ"
+"C
+L",,"correction factor C
+L"
+"C
+c",,"correction factor C
+c"
+d,mm,pitch diameter of smaller pulley
+D,mm,pitch diameter of bigger pulley
+I,mm,theoretical center distance
+"I
+e",mm,effective center distance
+i,,transmission ratio
+L’,mm,calculated pitch length
+"L
+e",mm,"external length (L+∆)
+p e"
+"L
+i",mm,"internal length (L-∆)
+p i"
+"L
+p",mm,pitch length (effective)
+"n
+1",RPM,speed of smaller pulley (faster)
+"n
+2",RPM,speed of bigger pulley (slower)
+P,kW,power to be transmitted
+"P
+a",kW,actual power of the transmission
+"P
+b",kW,basic performance of a single belt
+"P
+c",kW,corrected power
+"P
+d",kW,"difference to P due to K≠1
+b"
+Q,,number of belts
+"T
+s",N,static belt tension
+v,m/s,peripheral belt speed
+γ,°,arc of contact

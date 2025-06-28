@@ -1,0 +1,11 @@
+SYMBOL,UNIT,DEFINITION
+"C
+α",,arc correction factor
+m,kg/m,belt linear mass (see belt family page)
+"P
+c",kW,corrected power
+Q,,number of belts
+"T
+s",N/strand,static belt tension
+v,m/s,peripheral belt speed
+α,°,arc of contact

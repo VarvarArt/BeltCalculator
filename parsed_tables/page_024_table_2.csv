@@ -1,0 +1,7 @@
+SYMBOL,UNIT,DEFINITION
+"F
+r",Hz,natural frequency of belt
+m,kg/m,specific belt mass
+t,m,free span length
+"T
+s",N/strand,static belt tension (see page 9)

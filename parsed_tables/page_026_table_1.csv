@@ -1,0 +1,12 @@
+BELT CHARACTERISTICS,,,,,,,,,,
+SECTION,Z,A,B,C,D,E,20,25,45,50
+a (mm),10,13,17,22,32,40,20,25,45,50
+s (mm),6,8,11,14,19,25,"12,5",16,20,20
+Pitch length - internal length = ∆i (mm),25,33,43,62,76,105,48,61,91,85
+External length - pitch length = ∆e (mm),13,17,26,26,43,52,31,39,35,41
+Weigth (gr/m),60,100,175,300,610,930,240,400,1200,1365
+Min. Pulley diam. (Mm),60,90,125,200,300,500,160,250,320,320
+Working temperature,-30°C / +80°C,,,,,,,,,
+Relevant standards,ARPM/MPTA IP20 - DIN 2215 - ISO 4184,,,,,,,,,
+Relevant antistatic standard,ISO 1813,,,,,,,,,
+Materials,SBR and/or CR blend - polyester cord - cotton/polyester fabric,,,,,,,,,

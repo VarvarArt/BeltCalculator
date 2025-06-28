@@ -1,0 +1,15 @@
+FORCES AND TORQUE,,
+"19,1 • 106 • P
+F=
+u d 1 • n 1","2000 • M
+F=
+u d
+1","P • 103
+F=
+u V"
+"P • 9550
+M=
+t n
+1","M= F u • d 1
+t 2000","M= P • d 1
+t 2 • V"

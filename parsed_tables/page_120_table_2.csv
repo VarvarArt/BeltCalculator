@@ -1,0 +1,10 @@
+BELT CHARACTERISTICS,,,,,,,,,,,,
+SECTION,RA,RB,RC,RSPZ,RSPA,RSPB,RSPC,R3V,R5V,R8V,R3VX,R5VX
+a (mm),13,17,22,9.7,12.7,16.3,22,9,15,25,9,15
+s (mm),8,11,14,8,10,13,18,8,13,23,8,13
+t (mm),10,13,16,"10,5","12,5","15,5","22,5",10,15,"25,5",10,15
+"e (mm ± 0,3)",15,19,25.5,12,15,19,"25,5","10,3","17,5","28,6","10,3","17,5"
+Pitch length - internal length = i (mm),33,43,62,39,47,61,86,31,54,103,,
+Working temperature,-30°C / +80°C,,,,,,,,,,,
+Relevant standards,ASAE S 211.4 - ISO 8419,,,,,,,,,,,
+Materials,CR / SBR blend - polyester cord,,,,,,,,,,,
