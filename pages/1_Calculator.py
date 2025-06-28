@@ -11,9 +11,8 @@ from calculations import (
     get_power_from_dataframe
 )
 from data import (
-    STANDARD_PULLEY_DIAMETERS, STANDARD_BELT_LENGTHS, P0_DATA_BY_V_RANGES, P0_VALUES,
-    CL_DATA, CALPHA_DATA, CZ_DATA, LOAD_COEFFICIENTS, MATERIAL_P0_CORRECTION_FACTORS,
-    load_power_data
+    STANDARD_PULLEY_DIAMETERS, STANDARD_BELT_LENGTHS,
+    CL_DATA, CALPHA_DATA, CZ_DATA, LOAD_COEFFICIENTS, MATERIAL_P0_CORRECTION_FACTORS, PB_DATA
 )
 
 st.set_page_config(page_title="Калькулятор приводных ремней", page_icon="⚙️", layout="centered")
@@ -77,21 +76,14 @@ if st.button("Выполнить расчет"):
         belt_speed_v = calculate_belt_speed(selected_d1, n1)
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
-        p0_base = 0.0
-
-        if 'power_data_c' not in st.session_state:
-            st.session_state['power_data_c'] = load_power_data('C')
-
-        if belt_section == 'C' and st.session_state['power_data_c'] is not None:
-            st.success("✅ Используются точные данные из каталога для профиля 'C'.")
-            p0_base = get_power_from_dataframe(st.session_state['power_data_c'], float(selected_d1), float(n1))
-        else:
-            st.warning(f"⚠️ Используется обобщенный расчет для профиля '{belt_section}'.")
-            p0_base = get_p0_value(belt_section, belt_speed_v, 1.0)
-
+        p0_base = get_p0_value(belt_section, float(selected_d1), float(n1), material_correction_factor)
         if p0_base <= 0.0:
-            st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0. Расчет невозможен.")
+            st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0 из каталога для выбранных параметров. Расчет невозможен.")
             st.stop()
+        else:
+            st.success(f"✅ Используются точные данные из каталога для профиля '{belt_section}'.")
+        
+        p0_final = p0_base * material_correction_factor
 
         p0_final = p0_base * material_correction_factor
         st.write(f"**Номинальная мощность P0 (с учетом материала):** {p0_final:.2f} кВт")

@@ -5,62 +5,178 @@ import os
 import csv
 
 
-def load_power_data(profile, data_dir="parsed_data"):
-    """
-    Загружает "сырые" данные, извлеченные через find_tables(), и преобразует их
-    в готовый для использования формат ("длинный" DataFrame).
-    Эта версия написана максимально просто и надежно.
-    """
-    filename = f"power_data_{profile}_Pb_findtables.csv"
-    filepath = os.path.join(data_dir, filename)
+def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
+    cl_data_for_profiles = {profile: {} for profile in profiles_in_order}
+    try:
+        with open(filepath, mode='r', encoding='utf-8') as infile:
+            reader = csv.reader(infile)
+            # Skip header rows until we find the INCHES row
+            header_found = False
+            lengths_inches = []
+            for _ in range(10): # Limit rows to check to avoid infinite loop
+                row = next(reader)
+                if "INCHES" in row[0] or "INCHES" in row[1]: # Check both first columns
+                    lengths_inches = [float(l.replace('½', '.5').replace('¼', '.25').replace('¾', '.75').replace(',', '.').strip()) for l in row[1:] if l.strip()]
+                    header_found = True
+                    break
+            if not header_found:
+                print(f"Warning: Could not find 'INCHES' header in {filepath}. Skipping CL data for this file.")
+                return {}
 
-    if not os.path.exists(filepath):
-        print(f"Файл {filepath} не найден.")
-        return None
+            # Convert lengths to mm
+            lengths_mm = [l * 25.4 for l in lengths_inches]
 
+            for row in reader:
+                if not row or not row[0].strip():
+                    continue
+                profile_name = row[0].strip().replace('"', '')
+                if profile_name in profiles_in_order:
+                    cl_values = [float(val.replace(',', '.').strip()) for val in row[1:] if val.strip()]
+                    for i, cl_val in enumerate(cl_values):
+                        if i < len(lengths_mm):
+                            cl_data_for_profiles[profile_name][round(lengths_mm[i])] = cl_val
+        print(f"Successfully parsed CL data from {filepath}.")
+        return cl_data_for_profiles
+    except Exception as e:
+        print(f"Error parsing CL data from {filepath}: {e}")
+        return {}
+
+def _parse_pb_csv(filepath):
+    """
+    Parses a single Pb CSV file and returns a pandas DataFrame.
+    Assumes the first row is a header like "TABLE 4 - Pb (kW) referred to Ø (mm)",
+    the second row contains diameters, and subsequent rows contain RPM and Pb values.
+    """
     processed_data = []
     try:
         with open(filepath, mode='r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
 
-            # Пропускаем первую строку ("TABLE 4...")
+            # Skip the first row (e.g., "TABLE 4...")
             next(reader)
 
-            # Вторая строка - это заголовки с диаметрами
+            # The second row contains diameters
             header_row = next(reader)
-            diameters = [float(str(d).replace(',', '.')) for d in header_row[1:] if str(d).strip()]
+            # Clean and convert diameters, handling potential empty strings or non-numeric values
+            diameters = []
+            print(f"DEBUG: _parse_pb_csv - Processing file: {filepath}")
+            print(f"DEBUG: _parse_pb_csv - Header row: {header_row}")
+            for d_str in header_row[1:]:
+                d_clean = d_str.replace(',', '.').strip()
+                if d_clean and d_clean != 'Ø': # Exclude 'Ø' if it appears as a header
+                    try:
+                        diameters.append(float(d_clean))
+                    except ValueError:
+                        print(f"DEBUG: _parse_pb_csv - Skipping non-numeric diameter: {d_str}")
+                        pass
+            print(f"DEBUG: _parse_pb_csv - Parsed diameters: {diameters}")
+            
+            if not diameters:
+                print(f"Warning: No valid diameters found in header of {filepath}. Skipping Pb data for this file.")
+                return None
 
-            # Обрабатываем остальные строки с данными
-            for row in reader:
-                if not row or not row[0]: continue
+            # Process data rows
+            for row_idx, row in enumerate(reader):
+                if not row or not row[0].strip():
+                    continue
 
-                rpm_str = str(row[0]).replace('.', '')  # '1.000' -> '1000'
-                if not rpm_str.isdigit(): continue
-                rpm = float(rpm_str)
+                rpm_str = row[0].replace('.', '').strip() # '1.000' -> '1000'
+                try:
+                    rpm = float(rpm_str)
+                except ValueError:
+                    print(f"DEBUG: _parse_pb_csv - Skipping row {row_idx} due to invalid RPM: {rpm_str}")
+                    continue
 
                 power_values = row[1:]
                 for i, power_cell in enumerate(power_values):
-                    if i < len(diameters) and power_cell:
+                    if i < len(diameters) and power_cell.strip():
                         power_clean = power_cell.replace('*', '').replace(',', '.').strip()
                         if power_clean:
-                            processed_data.append({
-                                'd': diameters[i],
-                                'n1': rpm,
-                                'Pb': float(power_clean)
-                            })
+                            try:
+                                processed_data.append({
+                                    'd': diameters[i],
+                                    'n1': rpm,
+                                    'Pb': float(power_clean)
+                                })
+                            except ValueError:
+                                print(f"DEBUG: _parse_pb_csv - Skipping invalid power value '{power_cell}' at row {row_idx}, col {i}")
+                                pass
+            
+            if not processed_data:
+                print(f"Warning: No valid Pb data rows found in {filepath}. Returning empty DataFrame.")
+                return pd.DataFrame(columns=['d', 'n1', 'Pb'])
 
-        df_long = pd.DataFrame(processed_data)
-        print(f"Успешно загружены и преобразованы данные для профиля {profile}. Извлечено {len(df_long)} строк.")
-        return df_long
+        df_pb = pd.DataFrame(processed_data)
+        print(f"Successfully parsed Pb data from {filepath}. Extracted {len(df_pb)} rows.")
+        return df_pb
 
     except Exception as e:
-        print(f"КРИТИЧЕСКАЯ ОШИБКА при чтении файла {filepath}: {e}")
+        print(f"Error parsing Pb data from {filepath}: {e}")
         return None
 
 
+def load_all_data(data_dir="parsed_data"):
+    all_cl_data = {}
+    all_pb_data = {}
+
+    # Load CL data for Classical Wrapped Belts (Z, A, B, C, D, E, 20, 25)
+    cl_profiles_classical = ["Z", "A", "B", "C", "D", "E", "20", "25"]
+    cl_data_classical = _parse_cl_csv(os.path.join(data_dir, "page_026_table_2.csv"), cl_profiles_classical)
+    for profile, data in cl_data_classical.items():
+        all_cl_data[profile] = data
+
+    # Load CL data for Narrow Wrapped V-belts DIN (SPZ, SPA, SPB, SPC)
+    cl_profiles_narrow_wrapped_din = ["SPZ", "SPA", "SPB", "SPC"]
+    cl_data_narrow_wrapped_din = _parse_cl_csv(os.path.join(data_dir, "page_054_table_2.csv"), cl_profiles_narrow_wrapped_din)
+    for profile, data in cl_data_narrow_wrapped_din.items():
+        all_cl_data[profile] = data
+
+    # Load CL data for Narrow Wrapped V-belts ARPM (3V, 5V, 8V)
+    cl_profiles_narrow_wrapped_arpm = ["3V", "5V", "8V"]
+    cl_data_narrow_wrapped_arpm = _parse_cl_csv(os.path.join(data_dir, "page_072_table_2.csv"), cl_profiles_narrow_wrapped_arpm)
+    for profile, data in cl_data_narrow_wrapped_arpm.items():
+        all_cl_data[profile] = data
+
+    # Load CL data for Classical Raw Edge V-belts (AX, BX, CX)
+    cl_profiles_classical_raw_edge = ["AX", "BX", "CX"]
+    cl_data_classical_raw_edge = _parse_cl_csv(os.path.join(data_dir, "page_080_table_2.csv"), cl_profiles_classical_raw_edge)
+    for profile, data in cl_data_classical_raw_edge.items():
+        all_cl_data[profile] = data
+
+    # Load CL data for Narrow Raw Edge V-belts DIN (XPZ, XPA, XPB, XPC)
+    cl_profiles_narrow_raw_edge_din = ["XPZ", "XPA", "XPB", "XPC"]
+    cl_data_narrow_raw_edge_din = _parse_cl_csv(os.path.join(data_dir, "page_088_table_2.csv"), cl_profiles_narrow_raw_edge_din)
+    for profile, data in cl_data_narrow_raw_edge_din.items():
+        all_cl_data[profile] = data
+
+    # Load Pb data
+    pb_page_profile_map = {
+        '028': 'Z', '030': 'A', '032': 'A', '034': 'B', '036': 'B', '038': 'C',
+        '040': 'C', '042': 'D', '044': 'D', '046': 'E', '048': '20', '050': '25',
+        '056': 'SPZ', '058': 'SPZ', '060': 'SPA', '062': 'SPB', '064': 'SPB',
+        '066': 'SPC', '068': 'SPC', '070': 'SPC', '074': '3V', '076': '5V',
+        '078': '8V', '082': 'AX', '084': 'BX', '086': 'CX', '090': 'XPZ',
+        '092': 'XPA', '094': 'XPA', '096': 'XPB', '098': 'XPB', '100': 'XPC',
+        '102': 'XPC', '104': 'XPC'
+    }
+
+    for page_num_str, profile_name in pb_page_profile_map.items():
+        filepath = os.path.join(data_dir, f"page_{page_num_str}_table_1.csv")
+        if os.path.exists(filepath):
+            df_pb = _parse_pb_csv(filepath)
+            if df_pb is not None and not df_pb.empty:
+                all_pb_data[profile_name] = df_pb
+        else:
+            print(f"Warning: Pb data file not found for page {page_num_str} at {filepath}. Skipping.")
+
+    return {
+        "CL_DATA": all_cl_data,
+        "PB_DATA": all_pb_data
+    }
+
 # --- ВОССТАНОВЛЕННЫЕ СЛОВАРИ ДАННЫХ ---
 MIN_PULLEY_DIAMETERS = {"Z(0)": 50, "A": 71, "B": 112, "C": 180, "D": 280, "E": 450}
-LOAD_COEFFICIENTS = {"спокойная": 1.0, "средняя": 1.1, "тяжелая": 1.2, "ударная": 1.3}
+LOAD_COEFFICIENTS = {"спокойная": 1.1, "средняя": 1.2, "тяжелая": 1.4, "ударная": 1.5}
 STANDARD_BELT_LENGTHS = {
     "Z(0)": [360, 381, 395, 410, 420, 425, 435, 450, 457, 470, 480, 500, 530, 560, 600, 630, 670, 710, 750, 800, 850,
              900, 950, 1000, 1060, 1120, 1180, 1250, 1320, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2120, 2240, 2500,
@@ -87,17 +203,13 @@ STANDARD_PULLEY_DIAMETERS_COMMON = [50, 53, 56, 60, 63, 67, 71, 75, 80, 85, 90, 
 STANDARD_PULLEY_DIAMETERS = {"Z(0)": STANDARD_PULLEY_DIAMETERS_COMMON, "A": STANDARD_PULLEY_DIAMETERS_COMMON,
                              "B": STANDARD_PULLEY_DIAMETERS_COMMON, "C": STANDARD_PULLEY_DIAMETERS_COMMON,
                              "D": STANDARD_PULLEY_DIAMETERS_COMMON, "E": STANDARD_PULLEY_DIAMETERS_COMMON}
-P0_DATA_BY_V_RANGES = {"Z(0)": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))],
-                       "A": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))],
-                       "B": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))],
-                       "C": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))],
-                       "D": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))],
-                       "E": [(0, 5), (5, 10), (10, 15), (15, 20), (20, 25), (25, float('inf'))]}
-P0_VALUES = {"Z(0)": [0.20, 0.50, 0.90, 1.30, 1.60, 2.00], "A": [0.50, 0.95, 1.60, 2.15, 2.60, 3.00],
-             "B": [0.85, 1.40, 2.30, 3.10, 3.80, 4.50], "C": [1.20, 2.00, 3.00, 4.00, 4.80, 5.50],
-             "D": [2.00, 3.50, 5.20, 6.50, 7.40, 8.50], "E": [3.00, 5.00, 7.00, 8.80, 10.0, 11.5]}
-CL_DATA = {"Z(0)": {}, "A": {}, "B": {}, "C": {}, "D": {}, "E": {}}
-CALPHA_DATA = {(0, 120): 0.90, (120, 150): 0.95, (150, 170): 0.98, (170, 181): 1.00}
+_ALL_DATA = load_all_data(data_dir="D:/PycharmProjects/parsed_tables")
+
+CL_DATA = _ALL_DATA["CL_DATA"]
+PB_DATA = _ALL_DATA["PB_DATA"] # This will eventually hold DataFrames for each profile
+
+
+CALPHA_DATA = {(175, 181): 1.00, (165, 175): 0.98, (155, 165): 0.95, (145, 155): 0.92, (135, 145): 0.89, (125, 135): 0.86, (115, 125): 0.82, (105, 115): 0.78, (95, 105): 0.74, (0, 95): 0.69}
 CZ_DATA = {1: 1.00, 2: 1.15, 3: 1.25, 4: 1.30, 5: 1.35}
 MATERIAL_P0_CORRECTION_FACTORS = {"Стандартный (CR/Полиэстер)": 1.0, "Высокоэффективный (EPDM/Полиэстер)": 1.1,
                                   "Высокопрочный (CR/Арамид)": 1.2, "Премиум (TPU/Арамид или Сталь)": 1.35}

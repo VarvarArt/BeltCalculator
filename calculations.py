@@ -3,7 +3,7 @@
 import math
 import pandas as pd
 from data import (
-    LOAD_COEFFICIENTS, P0_DATA_BY_V_RANGES, P0_VALUES, CL_DATA, CALPHA_DATA, CZ_DATA, MIN_PULLEY_DIAMETERS
+    LOAD_COEFFICIENTS, CL_DATA, CALPHA_DATA, CZ_DATA, MIN_PULLEY_DIAMETERS, PB_DATA
 )
 
 
@@ -104,20 +104,13 @@ def calculate_belt_speed(d1, n1):
     return (math.pi * d1 * n1) / 60000
 
 
-def get_p0_value(belt_section, V, material_correction_factor=1.0, p0_ranges_data=P0_DATA_BY_V_RANGES,
-                 p0_values_data=P0_VALUES):
-    if belt_section not in p0_ranges_data or belt_section not in p0_values_data: return 0.0
-    speed_ranges = p0_ranges_data[belt_section]
-    p0_values_for_section = p0_values_data[belt_section]
-    p0_base = 0.0
-    if not speed_ranges or not p0_values_for_section: return 0.0  # <-- ВАЖНАЯ ЗАЩИТА
-    if V <= speed_ranges[0][0]:
-        p0_base = p0_values_for_section[0]
-    elif V > speed_ranges[-1][1]:
-        p0_base = p0_values_for_section[-1]
-    else:
-        for i, (min_v, max_v) in enumerate(speed_ranges):
-            if min_v < V <= max_v: p0_base = p0_values_for_section[i]; break
+def get_p0_value(belt_section, d1, n1, material_correction_factor=1.0):
+    if belt_section not in PB_DATA or PB_DATA[belt_section] is None:
+        return 0.0
+    
+    df_pb = PB_DATA[belt_section]
+    p0_base = get_power_from_dataframe(df_pb, d1, n1)
+    
     return p0_base * material_correction_factor
 
 
