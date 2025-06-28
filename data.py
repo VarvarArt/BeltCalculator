@@ -106,6 +106,7 @@ def _parse_pb_csv(filepath):
 
 
 def load_all_data(data_dir="parsed_data"):
+    print("DEBUG: load_all_data - Функция загрузки данных вызвана.")
     all_cl_data = {}
     all_pb_data = {}
 
