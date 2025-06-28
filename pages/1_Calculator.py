@@ -2,6 +2,8 @@
 
 import streamlit as st
 import math
+import io
+import sys
 
 from calculations import (
     calculate_transmission_ratio, calculate_design_power, determine_belt_section, get_min_pulley_diameter,
@@ -41,6 +43,12 @@ st.markdown("---")
 
 if st.button("Выполнить расчет"):
     st.header("4. Результаты расчета")
+    
+    # Перенаправление stdout для захвата отладочных сообщений
+    old_stdout = sys.stdout
+    redirected_output = io.StringIO()
+    sys.stdout = redirected_output
+
     try:
         transmission_ratio = calculate_transmission_ratio(n1, n2)
         st.write(f"**Теоретическое передаточное число (i):** {transmission_ratio:.2f}")
@@ -105,3 +113,10 @@ if st.button("Выполнить расчет"):
     except Exception as e:
         st.error(f"Произошла непредвиденная ошибка: {e}")
         st.warning("Пожалуйста, проверьте входные данные и попробуйте снова.")
+    finally:
+        # Восстановление stdout и отображение захваченных сообщений
+        sys.stdout = old_stdout
+        debug_output = redirected_output.getvalue()
+        if debug_output:
+            st.subheader("Отладочные сообщения:")
+            st.code(debug_output, language='text')
