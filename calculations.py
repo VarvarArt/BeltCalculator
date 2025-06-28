@@ -8,169 +8,168 @@ from data import (
 
 
 def get_power_from_dataframe(df, d_query, n_query):
-    debug_messages = []
-    debug_messages.append(f"DEBUG: get_power_from_dataframe - d_query: {d_query}, n_query: {n_query}")
     if df is None or df.empty:
-        debug_messages.append("DEBUG: get_power_from_dataframe - DataFrame is None or empty.")
-        return 0.0, debug_messages
-    try:
-        unique_d = sorted(df['d'].unique())
-        unique_n = sorted(df['n1'].unique())
-        debug_messages.append(f"DEBUG: get_power_from_dataframe - Unique d: {unique_d}, Unique n: {unique_n}")
+        return 0.0, ["DataFrame is empty"]
 
+    # Фильтруем DataFrame для нужного диаметра
+    d_data = df[df['d'] == d_query]
+    if d_data.empty:
+        # Если точного значения диаметра нет, используем интерполяцию по диаметру
+        unique_d = sorted(df['d'].unique())
         d_low = max([d for d in unique_d if d <= d_query], default=min(unique_d))
         d_high = min([d for d in unique_d if d >= d_query], default=max(unique_d))
-        n_low = max([n for n in unique_n if n <= n_query], default=min(unique_n))
-        n_high = min([n for n in unique_n if n >= n_query], default=max(unique_n))
-        debug_messages.append(f"DEBUG: get_power_from_dataframe - d_low: {d_low}, d_high: {d_high}, n_low: {n_low}, n_high: {n_high}")
 
-        def get_pb(d_val, n_val):
-            res = df[(df['d'] == d_val) & (df['n1'] == n_val)]['Pb']
-            return res.iloc[0] if not res.empty else 0
+        # Получаем значения для обоих диаметров
+        low_power = get_power_for_speed(df[df['d'] == d_low], n_query)
+        high_power = get_power_for_speed(df[df['d'] == d_high], n_query)
 
-        q11, q12, q21, q22 = get_pb(d_low, n_low), get_pb(d_low, n_high), get_pb(d_high, n_low), get_pb(d_high, n_high)
-        debug_messages.append(f"DEBUG: get_power_from_dataframe - q11: {q11}, q12: {q12}, q21: {q21}, q22: {q22}")
+        # Интерполируем по диаметру
+        return low_power + (high_power - low_power) * (d_query - d_low) / (d_high - d_low), []
+    else:
+        # Если диаметр точный, интерполируем только по скорости
+        return get_power_for_speed(d_data, n_query), []
 
-        if d_low == d_high and n_low == n_high:
-            debug_messages.append(f"DEBUG: get_power_from_dataframe - Exact match: {q11}")
-            return q11, debug_messages
-        if d_high - d_low == 0:
-            p = q11 + (q12 - q11) * (n_query - n_low) / (n_high - n_low) if n_high - n_low != 0 else q11
-            debug_messages.append(f"DEBUG: get_power_from_dataframe - Interpolating on n: {p}")
-            return p, debug_messages
-        if n_high - n_low == 0:
-            p = q11 + (q21 - q11) * (d_query - d_low) / (d_high - d_low) if d_high - d_low != 0 else q11
-            debug_messages.append(f"DEBUG: get_power_from_dataframe - Interpolating on d: {p}")
-            return p, debug_messages
 
-        r1 = ((d_high - d_query) / (d_high - d_low)) * q11 + ((d_query - d_low) / (d_high - d_low)) * q21
-        r2 = ((d_high - d_query) / (d_high - d_low)) * q12 + ((d_query - d_low) / (d_high - d_low)) * q22
-        p = ((n_high - n_query) / (n_high - n_low)) * r1 + ((n_query - n_low) / (n_high - n_low)) * r2
-        debug_messages.append(f"DEBUG: get_power_from_dataframe - Bilinear interpolation result: {p}")
-        return p, debug_messages
-    except Exception as e:
-        debug_messages.append(f"ERROR: get_power_from_dataframe - Exception: {e}")
-        return 0.0, debug_messages
+def get_power_for_speed(df, n_query):
+    n_sorted = sorted(df['n1'].unique())
+    if n_query in n_sorted:
+        return float(df[df['n1'] == n_query]['Pb'].iloc[0])
+
+    n_low = max([n for n in n_sorted if n <= n_query], default=min(n_sorted))
+    n_high = min([n for n in n_sorted if n >= n_query], default=max(n_sorted))
+
+    p_low = float(df[df['n1'] == n_low]['Pb'].iloc[0])
+    p_high = float(df[df['n1'] == n_high]['Pb'].iloc[0])
+
+    # Линейная интерполяция по скорости
+    return p_low + (p_high - p_low) * (n_query - n_low) / (n_high - n_low)
 
 
 def calculate_transmission_ratio(n1, n2):
-    if n2 == 0: raise ValueError("Частота вращения ведомого вала (n2) не может быть равна нулю.")
+    """Рассчитывает передаточное число."""
     return n1 / n2
 
 
-def calculate_design_power(nominal_power, load_type_choice, load_coefficients_data=LOAD_COEFFICIENTS):
-    load_mapping = {'1': "спокойная", '2': "средняя", '3': "тяжелая", '4': "ударная"}
-    load_type = load_mapping.get(load_type_choice)
-    if load_type is None: raise ValueError("Неизвестный тип нагрузки.")
-    kp_value = load_coefficients_data.get(load_type, 1.0)
-    return nominal_power * kp_value, kp_value
+def calculate_design_power(power, load_type):
+    """Рассчитывает расчетную мощность с учетом коэффициента режима работы."""
+    return power * LOAD_COEFFICIENTS.get(load_type, 1.0)
 
 
-def determine_belt_section(P_design, n1_rpm):
-    if P_design <= 0.75:
+def determine_belt_section(power, n1):
+    """Определяет сечение ремня на основе мощности и частоты вращения."""
+    if power <= 3:
         return 'A'
-    elif P_design <= 7.5:
+    elif power <= 15:
         return 'B'
-    elif P_design <= 30:
-        return 'C'
-    elif P_design <= 75:
-        return 'D'
-    elif P_design > 75:
-        return 'E'
-    return 'Не определено'
-
-
-def get_min_pulley_diameter(belt_section, min_pulley_diameters_data=MIN_PULLEY_DIAMETERS):
-    return min_pulley_diameters_data.get(belt_section)
-
-
-def find_nearest_standard_value(value, standard_list, greater_or_equal=True):
-    if not standard_list: return None
-    if greater_or_equal:
-        filtered_list = [s_val for s_val in standard_list if s_val >= value]
-        if not filtered_list: return max(standard_list)
-        return min(filtered_list)
     else:
-        return min(standard_list, key=lambda x: abs(x - value))
+        return 'C'
 
 
-def calculate_belt_length(d1, d2, a):
-    if a <= 0: raise ValueError("Межосевое расстояние не может быть равно нулю или быть отрицательным.")
-    return 2 * a + 0.5 * math.pi * (d1 + d2) + (d2 - d1) ** 2 / (4 * a)
+def get_min_pulley_diameter(belt_section):
+    """Возвращает минимальный диаметр шкива для заданного сечения ремня."""
+    return MIN_PULLEY_DIAMETERS.get(belt_section, 0)
 
 
-def calculate_actual_center_distance(lp, d1, d2):
-    w = 0.5 * math.pi * (d1 + d2)
-    y = (d2 - d1) ** 2
-    discriminant = (lp - w) ** 2 - 2 * y
-    if discriminant < 0: raise ValueError("Невозможно рассчитать: длина ремня слишком мала для выбранных шкивов.")
-    return 0.25 * ((lp - w) + math.sqrt(discriminant))
+def find_nearest_standard_value(value, standard_values):
+    """Находит ближайшее стандартное значение."""
+    if not standard_values:
+        return value
+    return min(standard_values, key=lambda x: abs(x - value))
 
 
-def get_actual_transmission_ratio(d1, d2, slip_coefficient=0.01):
-    if d1 == 0: raise ValueError("Диаметр ведущего шкива (d1) не может быть равен нулю.")
-    return d2 / (d1 * (1 - slip_coefficient))
+def calculate_belt_length(d1, d2, center_distance):
+    """Рассчитывает длину ремня."""
+    return 2 * center_distance + math.pi * (d1 + d2) / 2 + (d2 - d1) ** 2 / (4 * center_distance)
+
+
+def calculate_actual_center_distance(belt_length, d1, d2):
+    """Уточняет межосевое расстояние."""
+    # Используем упрощенную формулу без итераций
+    a = (belt_length - math.pi * (d1 + d2) / 2) / 2
+    h = (d2 - d1) / 2
+    return math.sqrt(a * a - h * h)
+
+
+def get_actual_transmission_ratio(d1, d2):
+    """Вычисляет фактическое передаточное число."""
+    return d2 / d1
 
 
 def calculate_belt_speed(d1, n1):
-    return (math.pi * d1 * n1) / 60000
+    """Рассчитывает скорость ремня."""
+    return math.pi * d1 * n1 / (60 * 1000)  # м/с
 
 
-def get_p0_value(belt_section, d1, n1, pb_data, material_correction_factor=1.0):
-    debug_messages = []
-    debug_messages.append(f"DEBUG: get_p0_value - belt_section: {belt_section}, d1: {d1}, n1: {n1}")
-    if belt_section not in pb_data or pb_data[belt_section] is None:
-        debug_messages.append(f"DEBUG: get_p0_value - No PB_DATA for belt_section: {belt_section}")
-        return 0.0, debug_messages
-    
-    df_pb = pb_data[belt_section]
-    p0_base, pb_debug_messages = get_power_from_dataframe(df_pb, d1, n1)
-    debug_messages.extend(pb_debug_messages)
-    
-    p0_final = p0_base * material_correction_factor
-    debug_messages.append(f"DEBUG: get_p0_value - p0_base: {p0_base}, material_correction_factor: {material_correction_factor}, p0_final: {p0_final}")
-    return p0_final, debug_messages
+def get_p0_value(pb_data, d1, n1, material_factor=1.0):
+    """Получает номинальную мощность P0 с учетом поправки на материал."""
+    p0, debug = get_power_from_dataframe(pb_data, d1, n1)
+    return p0 * material_factor, debug
 
 
-def get_cl_value(belt_section, lp, cl_data):
-    if belt_section not in cl_data or not cl_data[belt_section]: return 1.0
-    available_lengths = sorted(cl_data[belt_section].keys())
-    if not available_lengths: return 1.0
-    nearest_lp = min(available_lengths, key=lambda x: abs(x - lp))
-    return cl_data[belt_section][nearest_lp]
+def get_cl_value(cl_data, belt_section, belt_length):
+    """Получает коэффициент CL."""
+    section_data = cl_data.get(belt_section, {})
+    lengths = sorted(section_data.keys())
 
+    if not lengths:
+        return 1.0
 
-def calculate_angle_of_wrap(d1, d2, a):
-    if a == 0: raise ValueError("Межосевое расстояние не может быть равно нулю.")
-    argument_for_asin = (d2 - d1) / (2 * a)
-    if argument_for_asin > 1:
-        argument_for_asin = 1
-    elif argument_for_asin < -1:
-        argument_for_asin = -1
-    return math.degrees(math.pi - 2 * math.asin(argument_for_asin))
+    if belt_length <= min(lengths):
+        return section_data[min(lengths)]
+    if belt_length >= max(lengths):
+        return section_data[max(lengths)]
 
+    # Находим ближайшие значения для интерполяции
+    for i, length in enumerate(lengths):
+        if length > belt_length:
+            l1, l2 = lengths[i - 1], length
+            cl1, cl2 = section_data[l1], section_data[l2]
+            # Линейная интерполяция
+            return cl1 + (cl2 - cl1) * (belt_length - l1) / (l2 - l1)
 
-def get_calpha_value(alpha1_deg, calpha_data=CALPHA_DATA):
-    sorted_ranges = sorted(calpha_data.keys())
-    for min_alpha, max_alpha in sorted_ranges:
-        if min_alpha < alpha1_deg <= max_alpha: return calpha_data[(min_alpha, max_alpha)]
-    if alpha1_deg <= sorted_ranges[0][0]:
-        return calpha_data[sorted_ranges[0]]
-    elif alpha1_deg > sorted_ranges[-1][1]:
-        return calpha_data[sorted_ranges[-1]]
-    return 0.90
-
-
-def get_cz_value(z, cz_data=CZ_DATA):
-    if z <= 0: raise ValueError("Количество ремней должно быть положительным.")
-    if z in cz_data:
-        return cz_data[z]
-    elif z >= 5:
-        return cz_data[5]
     return 1.0
 
 
-def calculate_number_of_belts(p_design, p0, cl, calpha, cz_trial=1.0):
-    denominator = p0 * cl * calpha * cz_trial
-    if denominator == 0: raise ValueError("Деление на ноль при расчете количества ремней.")
-    return p_design / denominator
+def calculate_angle_of_wrap(d1, d2, center_distance):
+    """Рассчитывает угол обхвата малого шкива."""
+    return 180 - 57 * (d2 - d1) / center_distance
+
+
+def get_calpha_value(angle):
+    """Получает коэффициент Cα."""
+    angles = sorted(CALPHA_DATA.keys())
+
+    if angle <= min(angles):
+        return CALPHA_DATA[min(angles)]
+    if angle >= max(angles):
+        return CALPHA_DATA[max(angles)]
+
+    # Находим ближайшие значения для интерполяции
+    for i, a in enumerate(angles):
+        if a > angle:
+            a1, a2 = angles[i - 1], a
+            c1, c2 = CALPHA_DATA[a1], CALPHA_DATA[a2]
+            # Линейная интерполяция
+            return c1 + (c2 - c1) * (angle - a1) / (a2 - a1)
+
+    return 1.0
+
+
+def get_cz_value(z):
+    """Получает коэффициент Cz."""
+    belts = sorted(CZ_DATA.keys())
+
+    if z <= min(belts):
+        return CZ_DATA[min(belts)]
+    if z >= max(belts):
+        return CZ_DATA[max(belts)]
+
+    return CZ_DATA[z]
+
+
+def calculate_number_of_belts(design_power, p0, cl, calpha, cz):
+    """Рассчитывает необходимое количество ремней."""
+    if p0 <= 0 or cl <= 0 or calpha <= 0 or cz <= 0:
+        return float('inf')
+    z = design_power / (p0 * cl * calpha * cz)
+    return math.ceil(z)
