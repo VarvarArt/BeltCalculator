@@ -3,7 +3,7 @@
 import math
 import pandas as pd
 from data import (
-    LOAD_COEFFICIENTS, CL_DATA, CALPHA_DATA, CZ_DATA, MIN_PULLEY_DIAMETERS, PB_DATA
+    LOAD_COEFFICIENTS, CALPHA_DATA, CZ_DATA, MIN_PULLEY_DIAMETERS
 )
 
 
@@ -104,17 +104,17 @@ def calculate_belt_speed(d1, n1):
     return (math.pi * d1 * n1) / 60000
 
 
-def get_p0_value(belt_section, d1, n1, material_correction_factor=1.0):
-    if belt_section not in PB_DATA or PB_DATA[belt_section] is None:
+def get_p0_value(belt_section, d1, n1, pb_data, material_correction_factor=1.0):
+    if belt_section not in pb_data or pb_data[belt_section] is None:
         return 0.0
     
-    df_pb = PB_DATA[belt_section]
+    df_pb = pb_data[belt_section]
     p0_base = get_power_from_dataframe(df_pb, d1, n1)
     
     return p0_base * material_correction_factor
 
 
-def get_cl_value(belt_section, lp, cl_data=CL_DATA):
+def get_cl_value(belt_section, lp, cl_data):
     if belt_section not in cl_data or not cl_data[belt_section]: return 1.0
     available_lengths = sorted(cl_data[belt_section].keys())
     if not available_lengths: return 1.0

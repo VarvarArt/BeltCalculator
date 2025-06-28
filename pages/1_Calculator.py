@@ -50,6 +50,10 @@ if st.button("Выполнить расчет"):
     sys.stdout = redirected_output
 
     try:
+        _ALL_DATA = load_all_data(data_dir="D:/PycharmProjects/parsed_tables")
+        CL_DATA = _ALL_DATA["CL_DATA"]
+        PB_DATA = _ALL_DATA["PB_DATA"]
+
         transmission_ratio = calculate_transmission_ratio(n1, n2)
         st.write(f"**Теоретическое передаточное число (i):** {transmission_ratio:.2f}")
 
@@ -84,7 +88,7 @@ if st.button("Выполнить расчет"):
         belt_speed_v = calculate_belt_speed(selected_d1, n1)
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
-        p0_base = get_p0_value(belt_section, float(selected_d1), float(n1), material_correction_factor)
+        p0_base = get_p0_value(belt_section, float(selected_d1), float(n1), PB_DATA, material_correction_factor)
         if p0_base <= 0.0:
             st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0 из каталога для выбранных параметров. Расчет невозможен.")
             st.stop()
@@ -96,7 +100,7 @@ if st.button("Выполнить расчет"):
         p0_final = p0_base * material_correction_factor
         st.write(f"**Номинальная мощность P0 (с учетом материала):** {p0_final:.2f} кВт")
 
-        cl_value = get_cl_value(belt_section, selected_lp)
+        cl_value = get_cl_value(belt_section, selected_lp, CL_DATA)
         angle_alpha1_deg = calculate_angle_of_wrap(selected_d1, selected_d2, actual_center_distance)
         calpha_value = get_calpha_value(angle_alpha1_deg)
 
