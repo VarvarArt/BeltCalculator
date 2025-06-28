@@ -43,16 +43,15 @@ st.markdown("---")
 
 if st.button("Выполнить расчет"):
     st.header("4. Результаты расчета")
-    
-    # Перенаправление stdout для захвата отладочных сообщений
-    old_stdout = sys.stdout
-    redirected_output = io.StringIO()
-    sys.stdout = redirected_output
-
     try:
         _ALL_DATA = load_all_data(data_dir="D:/PycharmProjects/parsed_tables")
         CL_DATA = _ALL_DATA["CL_DATA"]
         PB_DATA = _ALL_DATA["PB_DATA"]
+        debug_messages = _ALL_DATA.get("DEBUG_MESSAGES", [])
+
+        if debug_messages:
+            st.subheader("Отладочные сообщения:")
+            st.code("\n".join(debug_messages), language='text')
 
         transmission_ratio = calculate_transmission_ratio(n1, n2)
         st.write(f"**Теоретическое передаточное число (i):** {transmission_ratio:.2f}")
@@ -117,10 +116,3 @@ if st.button("Выполнить расчет"):
     except Exception as e:
         st.error(f"Произошла непредвиденная ошибка: {e}")
         st.warning("Пожалуйста, проверьте входные данные и попробуйте снова.")
-    finally:
-        # Восстановление stdout и отображение захваченных сообщений
-        sys.stdout = old_stdout
-        debug_output = redirected_output.getvalue()
-        if debug_output:
-            st.subheader("Отладочные сообщения:")
-            st.code(debug_output, language='text')

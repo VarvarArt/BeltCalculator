@@ -7,23 +7,22 @@ import csv
 
 def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
     cl_data_for_profiles = {profile: {} for profile in profiles_in_order}
+    debug_messages = []
     try:
         with open(filepath, mode='r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
-            # Skip header rows until we find the INCHES row
             header_found = False
             lengths_inches = []
-            for _ in range(10): # Limit rows to check to avoid infinite loop
+            for _ in range(10):
                 row = next(reader)
-                if "INCHES" in row[0] or "INCHES" in row[1]: # Check both first columns
+                if "INCHES" in row[0] or "INCHES" in row[1]:
                     lengths_inches = [float(l.replace('½', '.5').replace('¼', '.25').replace('¾', '.75').replace(',', '.').strip()) for l in row[1:] if l.strip()]
                     header_found = True
                     break
             if not header_found:
-                print(f"Warning: Could not find 'INCHES' header in {filepath}. Skipping CL data for this file.")
-                return {}
+                debug_messages.append(f"Warning: Could not find 'INCHES' header in {filepath}. Skipping CL data for this file.")
+                return {}, debug_messages
 
-            # Convert lengths to mm
             lengths_mm = [l * 25.4 for l in lengths_inches]
 
             for row in reader:
@@ -35,36 +34,37 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
                     for i, cl_val in enumerate(cl_values):
                         if i < len(lengths_mm):
                             cl_data_for_profiles[profile_name][round(lengths_mm[i])] = cl_val
-        print(f"Successfully parsed CL data from {filepath}.")
-        return cl_data_for_profiles
+        debug_messages.append(f"Successfully parsed CL data from {filepath}.")
+        return cl_data_for_profiles, debug_messages
     except Exception as e:
-        print(f"Error parsing CL data from {filepath}: {e}")
-        return {}
+        debug_messages.append(f"Error parsing CL data from {filepath}: {e}")
+        return {}, debug_messages
 
 def _parse_pb_csv(filepath):
     processed_data = []
+    debug_messages = []
     try:
         with open(filepath, mode='r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
-            next(reader) # Skip the first row
+            next(reader)
 
             header_row = next(reader)
             diameters = []
-            print(f"DEBUG: _parse_pb_csv - Processing file: {filepath}")
-            print(f"DEBUG: _parse_pb_csv - Header row: {header_row}")
+            debug_messages.append(f"DEBUG: _parse_pb_csv - Processing file: {filepath}")
+            debug_messages.append(f"DEBUG: _parse_pb_csv - Header row: {header_row}")
             for d_str in header_row[1:]:
                 d_clean = d_str.replace(',', '.').strip()
                 if d_clean and d_clean != 'Ø':
                     try:
                         diameters.append(float(d_clean))
                     except ValueError:
-                        print(f"DEBUG: _parse_pb_csv - Skipping non-numeric diameter: {d_str}")
+                        debug_messages.append(f"DEBUG: _parse_pb_csv - Skipping non-numeric diameter: {d_str}")
                         pass
-            print(f"DEBUG: _parse_pb_csv - Parsed diameters: {diameters}")
+            debug_messages.append(f"DEBUG: _parse_pb_csv - Parsed diameters: {diameters}")
             
             if not diameters:
-                print(f"Warning: No valid diameters found in header of {filepath}. Skipping Pb data for this file.")
-                return None
+                debug_messages.append(f"Warning: No valid diameters found in header of {filepath}. Skipping Pb data for this file.")
+                return None, debug_messages
 
             for row_idx, row in enumerate(reader):
                 if not row or not row[0].strip():
@@ -74,7 +74,7 @@ def _parse_pb_csv(filepath):
                 try:
                     rpm = float(rpm_str)
                 except ValueError:
-                    print(f"DEBUG: _parse_pb_csv - Skipping row {row_idx} due to invalid RPM: {rpm_str}")
+                    debug_messages.append(f"DEBUG: _parse_pb_csv - Skipping row {row_idx} due to invalid RPM: {rpm_str}")
                     continue
 
                 power_values = row[1:]
@@ -89,58 +89,59 @@ def _parse_pb_csv(filepath):
                                     'Pb': float(power_clean)
                                 })
                             except ValueError:
-                                print(f"DEBUG: _parse_pb_csv - Skipping invalid power value '{power_cell}' at row {row_idx}, col {i}")
+                                debug_messages.append(f"DEBUG: _parse_pb_csv - Skipping invalid power value '{power_cell}' at row {row_idx}, col {i}")
                                 pass
             
             if not processed_data:
-                print(f"Warning: No valid Pb data rows found in {filepath}. Returning empty DataFrame.")
-                return pd.DataFrame(columns=['d', 'n1', 'Pb'])
+                debug_messages.append(f"Warning: No valid Pb data rows found in {filepath}. Returning empty DataFrame.")
+                return pd.DataFrame(columns=['d', 'n1', 'Pb']), debug_messages
 
         df_pb = pd.DataFrame(processed_data)
-        print(f"Successfully parsed Pb data from {filepath}. Extracted {len(df_pb)} rows.")
-        return df_pb
+        debug_messages.append(f"Successfully parsed Pb data from {filepath}. Extracted {len(df_pb)} rows.")
+        return df_pb, debug_messages
 
     except Exception as e:
-        print(f"Error parsing Pb data from {filepath}: {e}")
-        return None
+        debug_messages.append(f"Error parsing Pb data from {filepath}: {e}")
+        return None, debug_messages
 
 
 def load_all_data(data_dir="parsed_data"):
-    print("DEBUG: load_all_data - Функция загрузки данных вызвана.")
     all_cl_data = {}
     all_pb_data = {}
+    all_debug_messages = []
 
-    # Load CL data for Classical Wrapped Belts (Z, A, B, C, D, E, 20, 25)
+    all_debug_messages.append("DEBUG: load_all_data - Функция загрузки данных вызвана.")
+
     cl_profiles_classical = ["Z", "A", "B", "C", "D", "E", "20", "25"]
-    cl_data_classical = _parse_cl_csv(os.path.join(data_dir, "page_026_table_2.csv"), cl_profiles_classical)
+    cl_data_classical, debug_cl_classical = _parse_cl_csv(os.path.join(data_dir, "page_026_table_2.csv"), cl_profiles_classical)
+    all_debug_messages.extend(debug_cl_classical)
     for profile, data in cl_data_classical.items():
         all_cl_data[profile] = data
 
-    # Load CL data for Narrow Wrapped V-belts DIN (SPZ, SPA, SPB, SPC)
     cl_profiles_narrow_wrapped_din = ["SPZ", "SPA", "SPB", "SPC"]
-    cl_data_narrow_wrapped_din = _parse_cl_csv(os.path.join(data_dir, "page_054_table_2.csv"), cl_profiles_narrow_wrapped_din)
+    cl_data_narrow_wrapped_din, debug_cl_narrow_wrapped_din = _parse_cl_csv(os.path.join(data_dir, "page_054_table_2.csv"), cl_profiles_narrow_wrapped_din)
+    all_debug_messages.extend(debug_cl_narrow_wrapped_din)
     for profile, data in cl_data_narrow_wrapped_din.items():
         all_cl_data[profile] = data
 
-    # Load CL data for Narrow Wrapped V-belts ARPM (3V, 5V, 8V)
     cl_profiles_narrow_wrapped_arpm = ["3V", "5V", "8V"]
-    cl_data_narrow_wrapped_arpm = _parse_cl_csv(os.path.join(data_dir, "page_072_table_2.csv"), cl_profiles_narrow_wrapped_arpm)
+    cl_data_narrow_wrapped_arpm, debug_cl_narrow_wrapped_arpm = _parse_cl_csv(os.path.join(data_dir, "page_072_table_2.csv"), cl_profiles_narrow_wrapped_arpm)
+    all_debug_messages.extend(debug_cl_narrow_wrapped_arpm)
     for profile, data in cl_data_narrow_wrapped_arpm.items():
         all_cl_data[profile] = data
 
-    # Load CL data for Classical Raw Edge V-belts (AX, BX, CX)
     cl_profiles_classical_raw_edge = ["AX", "BX", "CX"]
-    cl_data_classical_raw_edge = _parse_cl_csv(os.path.join(data_dir, "page_080_table_2.csv"), cl_profiles_classical_raw_edge)
+    cl_data_classical_raw_edge, debug_cl_classical_raw_edge = _parse_cl_csv(os.path.join(data_dir, "page_080_table_2.csv"), cl_profiles_classical_raw_edge)
+    all_debug_messages.extend(debug_cl_classical_raw_edge)
     for profile, data in cl_data_classical_raw_edge.items():
         all_cl_data[profile] = data
 
-    # Load CL data for Narrow Raw Edge V-belts DIN (XPZ, XPA, XPB, XPC)
     cl_profiles_narrow_raw_edge_din = ["XPZ", "XPA", "XPB", "XPC"]
-    cl_data_narrow_raw_edge_din = _parse_cl_csv(os.path.join(data_dir, "page_088_table_2.csv"), cl_profiles_narrow_raw_edge_din)
+    cl_data_narrow_raw_edge_din, debug_cl_narrow_raw_edge_din = _parse_cl_csv(os.path.join(data_dir, "page_088_table_2.csv"), cl_profiles_narrow_raw_edge_din)
+    all_debug_messages.extend(debug_cl_narrow_raw_edge_din)
     for profile, data in cl_data_narrow_raw_edge_din.items():
         all_cl_data[profile] = data
 
-    # Load Pb data
     pb_page_profile_map = {
         '028': 'Z', '030': 'A', '032': 'A', '034': 'B', '036': 'B', '038': 'C',
         '040': 'C', '042': 'D', '044': 'D', '046': 'E', '048': '20', '050': '25',
@@ -154,15 +155,17 @@ def load_all_data(data_dir="parsed_data"):
     for page_num_str, profile_name in pb_page_profile_map.items():
         filepath = os.path.join(data_dir, f"page_{page_num_str}_table_1.csv")
         if os.path.exists(filepath):
-            df_pb = _parse_pb_csv(filepath)
+            df_pb, debug_pb = _parse_pb_csv(filepath)
+            all_debug_messages.extend(debug_pb)
             if df_pb is not None and not df_pb.empty:
                 all_pb_data[profile_name] = df_pb
         else:
-            print(f"Warning: Pb data file not found for page {page_num_str} at {filepath}. Skipping.")
+            all_debug_messages.append(f"Warning: Pb data file not found for page {page_num_str} at {filepath}. Skipping.")
 
     return {
         "CL_DATA": all_cl_data,
-        "PB_DATA": all_pb_data
+        "PB_DATA": all_pb_data,
+        "DEBUG_MESSAGES": all_debug_messages
     }
 
 # --- ВОССТАНОВЛЕННЫЕ СЛОВАРИ ДАННЫХ ---
