@@ -14,7 +14,7 @@ from calculations import (
 )
 from data import (
     STANDARD_PULLEY_DIAMETERS, STANDARD_BELT_LENGTHS,
-    CL_DATA, CALPHA_DATA, CZ_DATA, LOAD_COEFFICIENTS, MATERIAL_P0_CORRECTION_FACTORS, PB_DATA
+    CALPHA_DATA, CZ_DATA, LOAD_COEFFICIENTS, MATERIAL_P0_CORRECTION_FACTORS
 )
 
 st.set_page_config(page_title="Калькулятор приводных ремней", page_icon="⚙️", layout="centered")
