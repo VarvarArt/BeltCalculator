@@ -7,60 +7,55 @@ import csv
 
 import re
 
-def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
-    cl_data_for_profiles = {profile: {} for profile in profiles_in_order}
+def _parse_cl_csv(filepath, profiles_in_order):
     debug_messages = []
+    cl_data_for_profiles = {profile: {} for profile in profiles_in_order}
     try:
-        with open(filepath, mode='r', encoding='utf-8') as infile:
-            reader = csv.reader(infile)
-            header_found = False
-            lengths_inches = []
-            file_content = list(reader) # Read all content to iterate multiple times if needed
-            
-            # Try to find the header row with lengths
-            for row_idx, row in enumerate(file_content):
-                if len(row) > 1 and any(re.sub(r'[^\d.-]', '', cell.replace(',', '.').strip()) for cell in row[1:] if re.sub(r'[^\d.-]', '', cell.replace(',', '.').strip())):
-                    # This row likely contains lengths. Extract them.
-                    lengths_raw = row[1:]
-                    lengths_inches = []
-                    for l in lengths_raw:
-                        clean_l = re.sub(r'[^\d.-]', '', l.replace(',', '.').strip())
-                        if clean_l:
-                            try:
-                                lengths_inches.append(float(clean_l))
-                            except ValueError:
-                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric length: {l} in row {row_idx}")
-                    if lengths_inches: # Ensure we actually parsed some lengths
-                        header_found = True
-                        # Start reading actual data from the next row
-                        reader = csv.reader(file_content[row_idx+1:])
-                        break
-            
-            if not header_found:
-                debug_messages.append(f"Warning: Could not find a valid lengths header in {filepath}. Skipping CL data for this file.")
-                return {}, debug_messages
+        # Read the CSV using pandas, assuming header is on the second row (index 1)
+        # and comma is the decimal separator.
+        df_cl = pd.read_csv(filepath, header=1, decimal=',', index_col=0, encoding='utf-8')
+        debug_messages.append(f"DEBUG: _parse_cl_csv - Successfully read {filepath} with pandas.")
+        
+        # Clean column names (lengths) and convert to float, then to mm
+        lengths_inches = []
+        for col in df_cl.columns:
+            clean_col = re.sub(r'[^\d.-]', '', str(col).replace(',', '.').strip())
+            if clean_col:
+                try:
+                    lengths_inches.append(float(clean_col))
+                except ValueError:
+                    debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric column (length): {col}")
+        lengths_mm = [l * 25.4 for l in lengths_inches]
 
-            lengths_mm = [l * 25.4 for l in lengths_inches]
+        # Process each profile row
+        for profile_name in profiles_in_order:
+            if profile_name in df_cl.index:
+                row_data = df_cl.loc[profile_name]
+                cl_values = []
+                for val_idx, val in enumerate(row_data):
+                    # Ensure val is not NaN and is a string before cleaning
+                    if pd.isna(val):
+                        cl_values.append(None) # Or some other placeholder for missing data
+                        continue
+                    clean_val = re.sub(r'[^\d.-]', '', str(val).replace(',', '.').strip())
+                    if clean_val:
+                        try:
+                            cl_values.append(float(clean_val))
+                        except ValueError:
+                            debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric CL value '{val}' for profile {profile_name}")
+                            cl_values.append(None)
+                    else:
+                        cl_values.append(None)
 
-            for row in reader:
-                if not row or not row[0].strip():
-                    continue
-                profile_name = row[0].strip().replace('"', '')
-                if profile_name in profiles_in_order:
-                    cl_values = []
-                    for val in row[1:]:
-                        clean_val = re.sub(r'[^\d.-]', '', val.replace(',', '.').strip())
-                        if clean_val:
-                            try:
-                                cl_values.append(float(clean_val))
-                            except ValueError:
-                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric CL value: {val}")
-                    
-                    for i, cl_val in enumerate(cl_values):
-                        if i < len(lengths_mm):
-                            cl_data_for_profiles[profile_name][round(lengths_mm[i])] = cl_val
-        debug_messages.append(f"Successfully parsed CL data from {filepath}.")
+                for i, cl_val in enumerate(cl_values):
+                    if cl_val is not None and i < len(lengths_mm):
+                        cl_data_for_profiles[profile_name][round(lengths_mm[i])] = cl_val
+            else:
+                debug_messages.append(f"Warning: Profile '{profile_name}' not found in {filepath}.")
+
+        debug_messages.append(f"Successfully parsed CL data from {filepath} using pandas.")
         return cl_data_for_profiles, debug_messages
+
     except Exception as e:
         debug_messages.append(f"Error parsing CL data from {filepath}: {e}")
         return {}, debug_messages
