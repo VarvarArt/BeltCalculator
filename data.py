@@ -42,28 +42,19 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
         return {}
 
 def _parse_pb_csv(filepath):
-    """
-    Parses a single Pb CSV file and returns a pandas DataFrame.
-    Assumes the first row is a header like "TABLE 4 - Pb (kW) referred to Ø (mm)",
-    the second row contains diameters, and subsequent rows contain RPM and Pb values.
-    """
     processed_data = []
     try:
         with open(filepath, mode='r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
+            next(reader) # Skip the first row
 
-            # Skip the first row (e.g., "TABLE 4...")
-            next(reader)
-
-            # The second row contains diameters
             header_row = next(reader)
-            # Clean and convert diameters, handling potential empty strings or non-numeric values
             diameters = []
             print(f"DEBUG: _parse_pb_csv - Processing file: {filepath}")
             print(f"DEBUG: _parse_pb_csv - Header row: {header_row}")
             for d_str in header_row[1:]:
                 d_clean = d_str.replace(',', '.').strip()
-                if d_clean and d_clean != 'Ø': # Exclude 'Ø' if it appears as a header
+                if d_clean and d_clean != 'Ø':
                     try:
                         diameters.append(float(d_clean))
                     except ValueError:
@@ -75,12 +66,11 @@ def _parse_pb_csv(filepath):
                 print(f"Warning: No valid diameters found in header of {filepath}. Skipping Pb data for this file.")
                 return None
 
-            # Process data rows
             for row_idx, row in enumerate(reader):
                 if not row or not row[0].strip():
                     continue
 
-                rpm_str = row[0].replace('.', '').strip() # '1.000' -> '1000'
+                rpm_str = row[0].replace('.', '').strip()
                 try:
                     rpm = float(rpm_str)
                 except ValueError:
