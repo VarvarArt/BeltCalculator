@@ -20,8 +20,7 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
                 if "INCHES" in row[0] or "INCHES" in row[1]:
                     lengths_inches = []
                     for l in row[1:]:
-                        clean_l = re.sub(r'[^
-\d.-]', '', l.replace(',', '.').strip())
+                        clean_l = re.sub(r'[^\d.-]', '', l.replace(',', '.').strip())
                         if clean_l:
                             try:
                                 lengths_inches.append(float(clean_l))
@@ -42,8 +41,7 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
                 if profile_name in profiles_in_order:
                     cl_values = []
                     for val in row[1:]:
-                        clean_val = re.sub(r'[^
-\d.-]', '', val.replace(',', '.').strip())
+                        clean_val = re.sub(r'[^\d.-]', '', val.replace(',', '.').strip())
                         if clean_val:
                             try:
                                 cl_values.append(float(clean_val))
