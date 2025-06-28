@@ -15,21 +15,29 @@ def _parse_cl_csv(filepath, profiles_in_order, data_dir="parsed_data"):
             reader = csv.reader(infile)
             header_found = False
             lengths_inches = []
-            for _ in range(10):
-                row = next(reader)
-                if "INCHES" in row[0] or "INCHES" in row[1]:
+            file_content = list(reader) # Read all content to iterate multiple times if needed
+            
+            # Try to find the header row with lengths
+            for row_idx, row in enumerate(file_content):
+                if len(row) > 1 and any(re.sub(r'[^\d.-]', '', cell.replace(',', '.').strip()) for cell in row[1:] if re.sub(r'[^\d.-]', '', cell.replace(',', '.').strip())):
+                    # This row likely contains lengths. Extract them.
+                    lengths_raw = row[1:]
                     lengths_inches = []
-                    for l in row[1:]:
+                    for l in lengths_raw:
                         clean_l = re.sub(r'[^\d.-]', '', l.replace(',', '.').strip())
                         if clean_l:
                             try:
                                 lengths_inches.append(float(clean_l))
                             except ValueError:
-                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric length: {l}")
-                    header_found = True
-                    break
+                                debug_messages.append(f"DEBUG: _parse_cl_csv - Skipping non-numeric length: {l} in row {row_idx}")
+                    if lengths_inches: # Ensure we actually parsed some lengths
+                        header_found = True
+                        # Start reading actual data from the next row
+                        reader = csv.reader(file_content[row_idx+1:])
+                        break
+            
             if not header_found:
-                debug_messages.append(f"Warning: Could not find 'INCHES' header in {filepath}. Skipping CL data for this file.")
+                debug_messages.append(f"Warning: Could not find a valid lengths header in {filepath}. Skipping CL data for this file.")
                 return {}, debug_messages
 
             lengths_mm = [l * 25.4 for l in lengths_inches]
