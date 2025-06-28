@@ -8,37 +8,49 @@ from data import (
 
 
 def get_power_from_dataframe(df, d_query, n_query):
-    """
-    Извлекает мощность из DataFrame с помощью ручной билинейной интерполяции.
-    """
-    if df is None or df.empty: return 0.0
+    debug_messages = []
+    debug_messages.append(f"DEBUG: get_power_from_dataframe - d_query: {d_query}, n_query: {n_query}")
+    if df is None or df.empty:
+        debug_messages.append("DEBUG: get_power_from_dataframe - DataFrame is None or empty.")
+        return 0.0, debug_messages
     try:
         unique_d = sorted(df['d'].unique())
         unique_n = sorted(df['n1'].unique())
+        debug_messages.append(f"DEBUG: get_power_from_dataframe - Unique d: {unique_d}, Unique n: {unique_n}")
 
         d_low = max([d for d in unique_d if d <= d_query], default=min(unique_d))
         d_high = min([d for d in unique_d if d >= d_query], default=max(unique_d))
         n_low = max([n for n in unique_n if n <= n_query], default=min(unique_n))
         n_high = min([n for n in unique_n if n >= n_query], default=max(unique_n))
+        debug_messages.append(f"DEBUG: get_power_from_dataframe - d_low: {d_low}, d_high: {d_high}, n_low: {n_low}, n_high: {n_high}")
 
         def get_pb(d_val, n_val):
             res = df[(df['d'] == d_val) & (df['n1'] == n_val)]['Pb']
             return res.iloc[0] if not res.empty else 0
 
         q11, q12, q21, q22 = get_pb(d_low, n_low), get_pb(d_low, n_high), get_pb(d_high, n_low), get_pb(d_high, n_high)
+        debug_messages.append(f"DEBUG: get_power_from_dataframe - q11: {q11}, q12: {q12}, q21: {q21}, q22: {q22}")
 
-        if d_low == d_high and n_low == n_high: return q11
-        if d_high - d_low == 0: return q11 + (q12 - q11) * (n_query - n_low) / (
-                    n_high - n_low) if n_high - n_low != 0 else q11
-        if n_high - n_low == 0: return q11 + (q21 - q11) * (d_query - d_low) / (
-                    d_high - d_low) if d_high - d_low != 0 else q11
+        if d_low == d_high and n_low == n_high:
+            debug_messages.append(f"DEBUG: get_power_from_dataframe - Exact match: {q11}")
+            return q11, debug_messages
+        if d_high - d_low == 0:
+            p = q11 + (q12 - q11) * (n_query - n_low) / (n_high - n_low) if n_high - n_low != 0 else q11
+            debug_messages.append(f"DEBUG: get_power_from_dataframe - Interpolating on n: {p}")
+            return p, debug_messages
+        if n_high - n_low == 0:
+            p = q11 + (q21 - q11) * (d_query - d_low) / (d_high - d_low) if d_high - d_low != 0 else q11
+            debug_messages.append(f"DEBUG: get_power_from_dataframe - Interpolating on d: {p}")
+            return p, debug_messages
 
         r1 = ((d_high - d_query) / (d_high - d_low)) * q11 + ((d_query - d_low) / (d_high - d_low)) * q21
         r2 = ((d_high - d_query) / (d_high - d_low)) * q12 + ((d_query - d_low) / (d_high - d_low)) * q22
         p = ((n_high - n_query) / (n_high - n_low)) * r1 + ((n_query - n_low) / (n_high - n_low)) * r2
-        return p
-    except Exception:
-        return 0.0
+        debug_messages.append(f"DEBUG: get_power_from_dataframe - Bilinear interpolation result: {p}")
+        return p, debug_messages
+    except Exception as e:
+        debug_messages.append(f"ERROR: get_power_from_dataframe - Exception: {e}")
+        return 0.0, debug_messages
 
 
 def calculate_transmission_ratio(n1, n2):
@@ -105,13 +117,19 @@ def calculate_belt_speed(d1, n1):
 
 
 def get_p0_value(belt_section, d1, n1, pb_data, material_correction_factor=1.0):
+    debug_messages = []
+    debug_messages.append(f"DEBUG: get_p0_value - belt_section: {belt_section}, d1: {d1}, n1: {n1}")
     if belt_section not in pb_data or pb_data[belt_section] is None:
-        return 0.0
+        debug_messages.append(f"DEBUG: get_p0_value - No PB_DATA for belt_section: {belt_section}")
+        return 0.0, debug_messages
     
     df_pb = pb_data[belt_section]
-    p0_base = get_power_from_dataframe(df_pb, d1, n1)
+    p0_base, pb_debug_messages = get_power_from_dataframe(df_pb, d1, n1)
+    debug_messages.extend(pb_debug_messages)
     
-    return p0_base * material_correction_factor
+    p0_final = p0_base * material_correction_factor
+    debug_messages.append(f"DEBUG: get_p0_value - p0_base: {p0_base}, material_correction_factor: {material_correction_factor}, p0_final: {p0_final}")
+    return p0_final, debug_messages
 
 
 def get_cl_value(belt_section, lp, cl_data):

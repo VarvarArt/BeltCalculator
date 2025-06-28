@@ -49,10 +49,6 @@ if st.button("Выполнить расчет"):
         PB_DATA = _ALL_DATA["PB_DATA"]
         debug_messages = _ALL_DATA.get("DEBUG_MESSAGES", [])
 
-        if debug_messages:
-            st.subheader("Отладочные сообщения:")
-            st.code("\n".join(debug_messages), language='text')
-
         transmission_ratio = calculate_transmission_ratio(n1, n2)
         st.write(f"**Теоретическое передаточное число (i):** {transmission_ratio:.2f}")
 
@@ -87,7 +83,74 @@ if st.button("Выполнить расчет"):
         belt_speed_v = calculate_belt_speed(selected_d1, n1)
         st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
 
-        p0_base = get_p0_value(belt_section, float(selected_d1), float(n1), PB_DATA, material_correction_factor)
+        p0_base, p0_debug_messages = get_p0_value(belt_section, float(selected_d1), float(n1), PB_DATA, material_correction_factor)
+        debug_messages.extend(p0_debug_messages)
+
+        # Display debug messages before potentially stopping the app
+        if debug_messages:
+            st.write(f"DEBUG: Количество отладочных сообщений: {len(debug_messages)}")
+            st.write(debug_messages)
+            st.subheader("Отладочные сообщения:")
+            st.code("\n".join(debug_messages), language='text')
+
+        if p0_base <= 0.0:
+            st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0 из каталога для выбранных параметров. Расчет невозможен.")
+            st.stop()
+        else:
+            st.success(f"✅ Используются точные данные из каталога для профиля '{belt_section}'.")
+        
+        p0_final = p0_base * material_correction_factor
+
+        p0_final = p0_base * material_correction_factor
+        st.write(f"**Номинальная мощность P0 (с учетом материала):** {p0_final:.2f} кВт")
+
+        cl_value = get_cl_value(belt_section, selected_lp, CL_DATA)
+        angle_alpha1_deg = calculate_angle_of_wrap(selected_d1, selected_d2, actual_center_distance)
+        calpha_value = get_calpha_value(angle_alpha1_deg)
+
+        z_calculated_initial = calculate_number_of_belts(calculated_power, p0_final, cl_value, calpha_value, 1.0)
+        num_belts_rounded = math.ceil(z_calculated_initial) if z_calculated_initial > 0 else 1
+        cz_value_final = get_cz_value(num_belts_rounded)
+        final_z_value = calculate_number_of_belts(calculated_power, p0_final, cl_value, calpha_value, cz_value_final)
+        final_num_belts = math.ceil(final_z_value) if final_z_value > 0 else 1
+
+        st.info(
+            f"Коэффициент длины (CL): {cl_value:.2f} | Угол обхвата (α1): {angle_alpha1_deg:.2f}° | Коэф. угла (Cα): {calpha_value:.2f} | Коэф. кол-ва (Cz): {cz_value_final:.2f}")
+        st.success(f"**Рекомендуемое количество ремней: {final_num_belts} шт.**")
+
+        calculated_power, kp_value = calculate_design_power(power, load_type_choice)
+        st.write(f"**Коэффициент режима работы (Kp):** {kp_value}")
+        st.write(f"**Расчетная мощность (P_расч):** {calculated_power:.2f} кВт")
+
+        belt_section = determine_belt_section(calculated_power, n1)
+        st.write(f"**Предполагаемое сечение ремня:** {belt_section}")
+
+        min_d1 = get_min_pulley_diameter(belt_section)
+        standard_diameters = STANDARD_PULLEY_DIAMETERS.get(belt_section, [])
+        selected_d1 = find_nearest_standard_value(min_d1, standard_diameters, greater_or_equal=True)
+        st.write(f"**Выбранный стандартный диаметр ведущего шкива (d1):** {selected_d1} мм")
+
+        calculated_d2 = selected_d1 * transmission_ratio
+        selected_d2 = find_nearest_standard_value(calculated_d2, standard_diameters, greater_or_equal=False)
+        st.write(f"**Выбранный стандартный диаметр ведомого шкива (d2):** {selected_d2} мм")
+
+        actual_transmission_ratio = get_actual_transmission_ratio(selected_d1, selected_d2)
+        st.write(f"**Фактическое передаточное число (i_факт):** {actual_transmission_ratio:.2f}")
+
+        required_belt_length = calculate_belt_length(selected_d1, selected_d2, approx_center_distance)
+        standard_lengths = STANDARD_BELT_LENGTHS.get(belt_section, [])
+        selected_lp = find_nearest_standard_value(required_belt_length, standard_lengths, greater_or_equal=True)
+        st.write(f"**Выбранная стандартная длина ремня (Lp):** {selected_lp} мм")
+
+        actual_center_distance = calculate_actual_center_distance(selected_lp, selected_d1, selected_d2)
+        st.write(f"**Уточненное межосевое расстояние (a_ут):** {actual_center_distance:.2f} мм")
+
+        st.subheader("5. Расчет количества ремней")
+        belt_speed_v = calculate_belt_speed(selected_d1, n1)
+        st.write(f"**Окружная скорость ремня (V):** {belt_speed_v:.2f} м/с")
+
+        p0_base, p0_debug_messages = get_p0_value(belt_section, float(selected_d1), float(n1), PB_DATA, material_correction_factor)
+        debug_messages.extend(p0_debug_messages)
         if p0_base <= 0.0:
             st.error("ВНИМАНИЕ: Не удалось определить базовую мощность P0 из каталога для выбранных параметров. Расчет невозможен.")
             st.stop()
