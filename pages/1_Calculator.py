@@ -64,9 +64,9 @@ def main():
         st.write(f"P0: {p0:.2f} кВт; CL: {cl:.3f}; Cα: {calpha:.2f}; Cz: {cz:.2f}")
         st.write(f"Необходимое количество ремней: {belts}")
 
-        st.subheader("Отладка")
-        for msg in dbg_p0 + dbg_cl + dbg_belts + debug_all:
-            st.text(msg)
+        ##st.subheader("Отладка")
+        ##for msg in dbg_p0 + dbg_cl + dbg_belts + debug_all:
+            ##st.text(msg)
 
 if __name__ == "__main__":
     main()
